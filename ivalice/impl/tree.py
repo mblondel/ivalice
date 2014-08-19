@@ -66,15 +66,15 @@ def _impurity(X_t, y_t, j, s, min_samples_leaf):
 def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     n_samples, n_features = X.shape
 
-    root_indices = np.arange(n_samples)
+    indices = np.arange(n_samples)
 
-    stack = [(root_indices, 0, 0, 0)]
+    stack = [(0, n_samples, 0, 0, 0)]
     tree = Tree()
 
     node_t = 0
 
     while len(stack) > 0:
-        indices_t, left_t, depth_t, parent_t = stack.pop()
+        start_t, end_t, left_t, depth_t, parent_t = stack.pop()
 
         if node_t > 0:
             if left_t:
@@ -82,13 +82,15 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
             else:
                 tree.children_right[parent_t] = node_t
 
-        X_t, y_t = X[indices_t], y[indices_t]
-        N_t = len(X_t)
+        indices_t = indices[start_t:end_t]
+        mean_y_t = np.mean(y[indices_t])
+
+        N_t = end_t - start_t
 
         if depth_t == max_depth or N_t < min_samples_split:
             tree.threshold.append(UNDEFINED)
             tree.feature.append(UNDEFINED)
-            tree.value.append(np.mean(y_t))
+            tree.value.append(mean_y_t)
             tree.children_left.append(TREE_LEAF)
             tree.children_right.append(TREE_LEAF)
             node_t += 1
@@ -100,40 +102,46 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
         best_j = None
 
         for j in xrange(n_features):
-            values = np.unique(X_t[:, j])
+            cmp_func = lambda a,b: cmp(X[a, j], X[b, j])
+            indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
+            indices_t = indices[start_t:end_t]
 
-            for k in xrange(len(values) - 1):
-                thresh = (values[k + 1] - values[k]) / 2.0 + values[k]
-                imp = _impurity(X_t, y_t, j, thresh, min_samples_leaf)
+            # FIXME: take care of duplicate feature values.
+            for k in xrange(start_t, end_t - 1):
+                thresh = (X[indices[k + 1], j] - X[indices[k], j]) / 2.0 + \
+                        X[indices[k], j]
+                imp = _impurity(X[indices_t], y[indices_t], j, thresh,
+                                min_samples_leaf)
 
                 if imp < best_imp:
                     best_imp = imp
                     best_thresh = thresh
                     best_j = j
+                    pos_t = k + 1
 
         if best_thresh is None:
             tree.threshold.append(UNDEFINED)
             tree.feature.append(UNDEFINED)
-            tree.value.append(np.mean(y_t))
+            tree.value.append(mean_y_t)
             tree.children_left.append(TREE_LEAF)
             tree.children_right.append(TREE_LEAF)
             node_t += 1
 
             continue
 
-        indices_L = indices_t[X[indices_t, best_j] <= best_thresh]
-        indices_R = indices_t[X[indices_t, best_j] > best_thresh]
+        cmp_func = lambda a,b: cmp(X[a, best_j], X[b, best_j])
+        indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
 
         tree.threshold.append(best_thresh)
         tree.feature.append(best_j)
-        tree.value.append(np.mean(y_t))
+        tree.value.append(mean_y_t)
 
-        # Node ids of children are not known yet.
+        # Children node ids are not known yet.
         tree.children_left.append(0)
         tree.children_right.append(0)
 
-        stack.append((indices_L, 1, depth_t + 1, node_t))
-        stack.append((indices_R, 0, depth_t + 1, node_t))
+        stack.append((start_t, pos_t, 1, depth_t + 1, node_t))
+        stack.append((pos_t, end_t, 0, depth_t + 1, node_t))
 
         node_t += 1
 
