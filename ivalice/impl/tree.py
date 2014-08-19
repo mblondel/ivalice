@@ -9,6 +9,7 @@ UNDEFINED = -2
 
 DOUBLE_MAX = np.finfo(np.float64).max
 
+
 class Tree(object):
 
     def __init__(self):
@@ -19,24 +20,25 @@ class Tree(object):
         self.children_right = []
 
     def finalize(self):
-        for attr in ("threshold", "feature", "value",
-                     "children_left", "children_right", ):
-            setattr(self, attr, np.array(getattr(self, attr)))
+        self.threshold = np.array(self.threshold, dtype=np.float64)
+        self.feature = np.array(self.feature, dtype=np.int32)
+        self.value = np.array(self.value, dtype=np.float64)
+        self.children_left = np.array(self.children_left, dtype=np.int32)
+        self.children_right = np.array(self.children_right, dtype=np.int32)
         return self
 
 
-def _apply(X, tree):
-    nodes = []
+@numba.jit("void(f8[:,:], i4[:], f8[:], i4[:], i4[:], i4[:])", nopython=True)
+def _apply(X, feature, threshold, children_left, children_right, out):
     for i in range(X.shape[0]):
         node = 0
         # While node not a leaf
-        while tree.children_left[node] != TREE_LEAF:
-            if X[i, tree.feature[node]] <= tree.threshold[node]:
-                node = tree.children_left[node]
+        while children_left[node] != TREE_LEAF:
+            if X[i, feature[node]] <= threshold[node]:
+                node = children_left[node]
             else:
-                node = tree.children_right[node]
-        nodes.append(node)
-    return np.array(nodes)
+                node = children_right[node]
+        out[i] = node
 
 
 @numba.jit("f8(f8[:,:], f8[:], i4[:], i4, i4, i4, f8, i4)", nopython=True)
@@ -176,4 +178,7 @@ class DecisionTreeRegressor(BaseEstimator, RegressorMixin):
         return self
 
     def predict(self, X):
-        return self.tree_.value.take(_apply(X, self.tree_))
+        nodes = np.empty(X.shape[0], dtype=np.int32)
+        _apply(X, self.tree_.feature, self.tree_.threshold,
+               self.tree_.children_left, self.tree_.children_right, nodes)
+        return self.tree_.value.take(nodes)
