@@ -1,10 +1,13 @@
 import numpy as np
+import numba
 
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
 
 TREE_LEAF = -1
 UNDEFINED = -2
+
+DOUBLE_MAX = np.finfo(np.float64).max
 
 class Tree(object):
 
@@ -36,29 +39,36 @@ def _apply(X, tree):
     return np.array(nodes)
 
 
-def _impurity(X_t, y_t, j, s, min_samples_leaf):
-    cond = X_t[:, j] > s
+@numba.jit("f8(f8[:,:], f8[:], i4[:], i4, i4, i4, f8, i4)", nopython=True)
+def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
+    N_t = end_t - start_t
+    N_L = 0
+    N_R = 0
+    y_hat_L = 0
+    y_hat_R = 0
 
-    if len(cond) == 0:
-        return np.inf
+    for i in xrange(start_t, end_t):
+        if X[indices[i], j] > s:
+            N_R += 1
+            y_hat_R += y[indices[i]]
+        else:
+            N_L += 1
+            y_hat_L += y[indices[i]]
 
-    X_L = X_t[cond]
-    X_R = X_t[~cond]
-    y_L = y_t[cond]
-    y_R = y_t[~cond]
+    if N_R < min_samples_leaf or N_L < min_samples_leaf:
+        return DOUBLE_MAX
 
-    N_t = len(X_t)
-    N_L = len(X_L)
-    N_R = len(X_R)
+    y_hat_L /= N_L
+    y_hat_R /= N_R
 
-    if N_L < min_samples_leaf or N_R < min_samples_leaf:
-        return np.inf
+    err_L = 0
+    err_R = 0
 
-    y_hat_L = np.mean(y_L)
-    y_hat_R = np.mean(y_R)
-
-    err_L = np.sum((y_L - y_hat_L) ** 2)
-    err_R = np.sum((y_R - y_hat_R) ** 2)
+    for i in xrange(start_t, end_t):
+        if X[indices[i], j] > s:
+            err_R += (y[indices[i]] - y_hat_R) ** 2
+        else:
+            err_L += (y[indices[i]] - y_hat_L) ** 2
 
     return (err_L + err_R) / N_t
 
@@ -66,7 +76,7 @@ def _impurity(X_t, y_t, j, s, min_samples_leaf):
 def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     n_samples, n_features = X.shape
 
-    indices = np.arange(n_samples)
+    indices = np.arange(n_samples).astype(np.int32)
 
     stack = [(0, n_samples, 0, 0, 0)]
     tree = Tree()
@@ -97,7 +107,7 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
 
             continue
 
-        best_imp = np.inf
+        best_imp = DOUBLE_MAX
         best_thresh = None
         best_j = None
 
@@ -110,7 +120,10 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
             for k in xrange(start_t, end_t - 1):
                 thresh = (X[indices[k + 1], j] - X[indices[k], j]) / 2.0 + \
                         X[indices[k], j]
-                imp = _impurity(X[indices_t], y[indices_t], j, thresh,
+
+                # FIXME: impurity can be computed efficiently from last
+                # iteration.
+                imp = _impurity(X, y, indices, start_t, end_t, j, thresh,
                                 min_samples_leaf)
 
                 if imp < best_imp:
