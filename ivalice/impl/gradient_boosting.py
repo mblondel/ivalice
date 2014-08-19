@@ -153,5 +153,3 @@ class GBRegressor(BaseEstimator):
         for i, est in enumerate(self.estimators_):
             pred += self.estimator_weights_[i] * est.predict(X)
         return pred
-
-
