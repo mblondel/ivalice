@@ -75,6 +75,12 @@ def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
     return (err_L + err_R) / N_t
 
 
+# TODO:
+# - implement introsort
+#   (sort both X[start_t:end_t, j] and samples[start_t:end_t])
+# - pre-allocate stack
+# - use numba for entire split search
+# - implement gini and entropy criteria
 def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     n_samples, n_features = X.shape
 
