@@ -1,3 +1,8 @@
+"""McRank"""
+
+# Author: Mathieu Blondel <mathieu@mblondel.org>
+# License: BSD 3 clause
+
 import numpy as np
 
 from sklearn.base import BaseEstimator, clone

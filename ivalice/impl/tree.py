@@ -1,3 +1,8 @@
+"""Regression trees"""
+
+# Author: Mathieu Blondel <mathieu@mblondel.org>
+# License: BSD 3 clause
+
 import numpy as np
 import numba
 
