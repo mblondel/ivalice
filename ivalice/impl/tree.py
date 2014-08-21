@@ -26,6 +26,21 @@ class Tree(object):
         self.children_left = []
         self.children_right = []
 
+    def add_node(self, threshold, feature, value,
+                 child_left=0, child_right=0):
+        self.threshold.append(threshold)
+        self.feature.append(feature)
+        self.value.append(value)
+        self.children_left.append(child_left)
+        self.children_right.append(child_right)
+
+    def add_terminal_node(self, value):
+        self.threshold.append(UNDEFINED)
+        self.feature.append(UNDEFINED)
+        self.value.append(value)
+        self.children_left.append(TREE_LEAF)
+        self.children_right.append(TREE_LEAF)
+
     def finalize(self):
         self.threshold = np.array(self.threshold, dtype=np.float64)
         self.feature = np.array(self.feature, dtype=np.int32)
@@ -123,9 +138,7 @@ def _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
 
 # TODO:
 # - implement introsort
-#   (sort both X[start_t:end_t, j] and samples[start_t:end_t])
 # - pre-allocate stack
-# - use numba for entire split search
 # - implement gini and entropy criteria
 def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     n_samples, n_features = X.shape
@@ -157,13 +170,8 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
         N_t = end_t - start_t
 
         if depth_t == max_depth or N_t < min_samples_split:
-            tree.threshold.append(UNDEFINED)
-            tree.feature.append(UNDEFINED)
-            tree.value.append(mean_y_t)
-            tree.children_left.append(TREE_LEAF)
-            tree.children_right.append(TREE_LEAF)
+            tree.add_terminal_node(mean_y_t)
             node_t += 1
-
             continue
 
         _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
@@ -173,26 +181,17 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
         pos_t = out_i4[1]
 
         if best_j == -1:
-            tree.threshold.append(UNDEFINED)
-            tree.feature.append(UNDEFINED)
-            tree.value.append(mean_y_t)
-            tree.children_left.append(TREE_LEAF)
-            tree.children_right.append(TREE_LEAF)
+            tree.add_terminal_node(mean_y_t)
             node_t += 1
-
             continue
 
         # FIXME: move to _best_split
         cmp_func = lambda a,b: cmp(X[a, best_j], X[b, best_j])
         indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
 
-        tree.threshold.append(best_thresh)
-        tree.feature.append(best_j)
-        tree.value.append(mean_y_t)
-
-        # Children node ids are not known yet.
-        tree.children_left.append(0)
-        tree.children_right.append(0)
+        tree.add_node(threshold=best_thresh,
+                      feature=best_j,
+                      value=mean_y_t)
 
         stack.append((start_t, pos_t, 1, depth_t + 1, node_t))
         stack.append((pos_t, end_t, 0, depth_t + 1, node_t))
