@@ -143,10 +143,8 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     n_samples, n_features = X.shape
 
     indices = np.arange(n_samples).astype(np.int32)
-
     stack = [(0, n_samples, 0, 0, 0)]
     tree = Tree()
-
     node_t = 0
 
     # Buffers
@@ -155,27 +153,34 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     out_i4 = np.zeros(2, dtype=np.int32)
 
     while len(stack) > 0:
+        # Pick node from the stack.
         start_t, end_t, left_t, depth_t, parent_t = stack.pop()
 
         if node_t > 0:
+            # Adjust children node id of parent.
             if left_t:
                 tree.children_left[parent_t] = node_t
             else:
                 tree.children_right[parent_t] = node_t
 
+        # Node value.
         y_hat_t = np.mean(y[indices[start_t:end_t]])
 
+        # Number of samples which reached that node.
         N_t = end_t - start_t
 
+        # Terminal node if max_depth or min_samples_split conditions are met.
         if depth_t == max_depth or N_t < min_samples_split:
             tree.add_terminal_node(y_hat_t)
             node_t += 1
             continue
 
+        # Find best split across all features.
         _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
                     out_f8, out_i4)
         best_thresh, best_j, pos_t = out_f8[0], out_i4[0], out_i4[1]
 
+        # No best split found: terminal node.
         if best_j == -1:
             tree.add_terminal_node(y_hat_t)
             node_t += 1
@@ -185,10 +190,12 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
         cmp_func = lambda a,b: cmp(X[a, best_j], X[b, best_j])
         indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
 
+        # Add node to the tree.
         tree.add_node(threshold=best_thresh,
                       feature=best_j,
                       value=y_hat_t)
 
+        # Add left and right children to the stack.
         stack.append((start_t, pos_t, 1, depth_t + 1, node_t))
         stack.append((pos_t, end_t, 0, depth_t + 1, node_t))
 
