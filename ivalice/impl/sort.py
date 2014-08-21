@@ -1,6 +1,7 @@
 """Efficient sorting routines"""
 
 # Authors: Jake Vanderplas <jakevdp@cs.washington.edu> (quicksort)
+#          Lars Buitinck <L.J.Buitinck@uva.nl> (heapsort)
 #          Mathieu Blondel <mathieu@mblondel.org> (Numba port)
 # License: BSD 3 clause
 
@@ -97,3 +98,44 @@ def quicksort(values, indices, start, end):
         i = _partition(values, indices, start, end)
         quicksort(values, indices, start, i - 1)
         quicksort(values, indices, i + 1, end)
+
+
+@numba.njit("void(f8[:], i4[:], i4, i4)")
+def _sift_down(values, indices, start, end):
+    # Restore heap order in Xf[start:end] by moving the max element to start.
+
+    root = start
+    while True:
+        child = root * 2 + 1
+
+        # find max of root, left child, right child
+        maxind = root
+        if child < end and values[maxind] < values[child]:
+            maxind = child
+        if child + 1 < end and values[maxind] < values[child + 1]:
+            maxind = child + 1
+
+        if maxind == root:
+            break
+        else:
+            _dual_swap(values, indices, root, maxind)
+            root = maxind
+
+
+@numba.njit("void(f8[:], i4[:], i4)")
+def heapsort(values, indices, size):
+    # heapify
+    start = (size - 2) / 2
+    end = size
+    while True:
+        _sift_down(values, indices, start, end)
+        if start == 0:
+            break
+        start -= 1
+
+    # sort by shrinking the heap, putting the max element immediately after it
+    end = size - 1
+    while end > 0:
+        _dual_swap(values, indices, 0, end)
+        _sift_down(values, indices, 0, end)
+        end -= 1
