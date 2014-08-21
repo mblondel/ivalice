@@ -33,7 +33,7 @@ class Tree(object):
         return self
 
 
-@numba.jit("void(f8[:,:], i4[:], f8[:], i4[:], i4[:], i4[:])", nopython=True)
+@numba.njit("void(f8[:,:], i4[:], f8[:], i4[:], i4[:], i4[:])")
 def _apply(X, feature, threshold, children_left, children_right, out):
     for i in range(X.shape[0]):
         node = 0
@@ -46,7 +46,7 @@ def _apply(X, feature, threshold, children_left, children_right, out):
         out[i] = node
 
 
-@numba.jit("f8(f8[:,:], f8[:], i4[:], i4, i4, i4, f8, i4)", nopython=True)
+@numba.njit("f8(f8[:,:], f8[:], i4[:], i4, i4, i4, f8, i4)")
 def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
     N_t = end_t - start_t
     N_L = 0
