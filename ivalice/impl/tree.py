@@ -104,8 +104,7 @@ def _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
 
     best_imp = DOUBLE_MAX
     best_thresh = 0
-    out_i4[0] = -1
-    best_j = out_i4[0]
+    best_j = -1
 
     size_t = end_t - start_t
 
@@ -134,6 +133,16 @@ def _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
     out_f8[0] = best_thresh
     out_i4[0] = best_j
     out_i4[1] = pos_t
+
+    best_j = out_i4[0]  # workaround some bug in Numba
+
+    if best_j != -1:
+        # Reorder indices for the best split.
+        for p in xrange(start_t, end_t):
+            Xj[p] = X[indices[p], best_j]
+
+        heapsort(Xj[start_t:end_t], indices[start_t:end_t], size_t)
+
 
 # TODO:
 # - implement introsort
@@ -185,10 +194,6 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
             tree.add_terminal_node(y_hat_t)
             node_t += 1
             continue
-
-        # FIXME: move to _best_split
-        cmp_func = lambda a,b: cmp(X[a, best_j], X[b, best_j])
-        indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
 
         # Add node to the tree.
         tree.add_node(threshold=best_thresh,
