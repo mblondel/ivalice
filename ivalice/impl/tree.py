@@ -63,8 +63,8 @@ def _apply(X, feature, threshold, children_left, children_right, out):
         out[i] = node
 
 
-@numba.njit("f8(f8[:,:], f8[:], i4[:], i4, i4, i4, f8, i4)")
-def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
+@numba.njit("f8(f8[:], f8[:], i4[:], i4, i4, f8, i4)")
+def _impurity(Xj, y, indices, start_t, end_t, s, min_samples_leaf):
     N_t = end_t - start_t
     N_L = 0
     N_R = 0
@@ -72,7 +72,7 @@ def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
     y_hat_R = 0
 
     for i in xrange(start_t, end_t):
-        if X[indices[i], j] > s:
+        if Xj[i] > s:
             N_R += 1
             y_hat_R += y[indices[i]]
         else:
@@ -89,7 +89,7 @@ def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
     err_R = 0
 
     for i in xrange(start_t, end_t):
-        if X[indices[i], j] > s:
+        if Xj[i] > s:
             err_R += (y[indices[i]] - y_hat_R) ** 2
         else:
             err_L += (y[indices[i]] - y_hat_L) ** 2
@@ -118,12 +118,11 @@ def _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
 
         # FIXME: take care of duplicate feature values.
         for k in xrange(start_t, end_t - 1):
-            thresh = (X[indices[k + 1], j] - X[indices[k], j]) / 2.0 + \
-                    X[indices[k], j]
+            thresh = (Xj[k + 1] - Xj[k]) / 2.0 + Xj[k]
 
             # FIXME: impurity can be computed efficiently from last
             # iteration.
-            imp = _impurity(X, y, indices, start_t, end_t, j, thresh,
+            imp = _impurity(Xj, y, indices, start_t, end_t, thresh,
                             min_samples_leaf)
 
             if imp < best_imp:
