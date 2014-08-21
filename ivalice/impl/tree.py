@@ -9,6 +9,8 @@ import numba
 from sklearn.base import BaseEstimator
 from sklearn.base import RegressorMixin
 
+from .sort import heapsort, quicksort
+
 TREE_LEAF = -1
 UNDEFINED = -2
 
@@ -80,6 +82,45 @@ def _impurity(X, y, indices, start_t, end_t, j, s, min_samples_leaf):
     return (err_L + err_R) / N_t
 
 
+@numba.njit("void(f8[:,:], f8[:], i4[:], f8[:], i4, i4, i4, f8[:], i4[:])")
+def _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
+                out_f8, out_i4):
+    n_features = X.shape[1]
+
+    best_imp = DOUBLE_MAX
+    best_thresh = 0
+    out_i4[0] = -1
+    best_j = out_i4[0]
+
+    size_t = end_t - start_t
+
+    for j in xrange(n_features):
+
+        for p in xrange(start_t, end_t):
+            Xj[p] = X[indices[p], j]
+
+        heapsort(Xj[start_t:end_t], indices[start_t:end_t], size_t)
+
+        # FIXME: take care of duplicate feature values.
+        for k in xrange(start_t, end_t - 1):
+            thresh = (X[indices[k + 1], j] - X[indices[k], j]) / 2.0 + \
+                    X[indices[k], j]
+
+            # FIXME: impurity can be computed efficiently from last
+            # iteration.
+            imp = _impurity(X, y, indices, start_t, end_t, j, thresh,
+                            min_samples_leaf)
+
+            if imp < best_imp:
+                best_imp = imp
+                best_thresh = thresh
+                best_j = j
+                pos_t = k + 1
+
+    out_f8[0] = best_thresh
+    out_i4[0] = best_j
+    out_i4[1] = pos_t
+
 # TODO:
 # - implement introsort
 #   (sort both X[start_t:end_t, j] and samples[start_t:end_t])
@@ -95,6 +136,11 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     tree = Tree()
 
     node_t = 0
+
+    # Buffers
+    Xj = np.zeros(n_samples, dtype=np.float64)
+    out_f8 = np.zeros(1, dtype=np.float64)
+    out_i4 = np.zeros(2, dtype=np.int32)
 
     while len(stack) > 0:
         start_t, end_t, left_t, depth_t, parent_t = stack.pop()
@@ -120,32 +166,13 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
 
             continue
 
-        best_imp = DOUBLE_MAX
-        best_thresh = None
-        best_j = None
+        _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
+                    out_f8, out_i4)
+        best_thresh = out_f8[0]
+        best_j = out_i4[0]
+        pos_t = out_i4[1]
 
-        for j in xrange(n_features):
-            cmp_func = lambda a,b: cmp(X[a, j], X[b, j])
-            indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
-            indices_t = indices[start_t:end_t]
-
-            # FIXME: take care of duplicate feature values.
-            for k in xrange(start_t, end_t - 1):
-                thresh = (X[indices[k + 1], j] - X[indices[k], j]) / 2.0 + \
-                        X[indices[k], j]
-
-                # FIXME: impurity can be computed efficiently from last
-                # iteration.
-                imp = _impurity(X, y, indices, start_t, end_t, j, thresh,
-                                min_samples_leaf)
-
-                if imp < best_imp:
-                    best_imp = imp
-                    best_thresh = thresh
-                    best_j = j
-                    pos_t = k + 1
-
-        if best_thresh is None:
+        if best_j == -1:
             tree.threshold.append(UNDEFINED)
             tree.feature.append(UNDEFINED)
             tree.value.append(mean_y_t)
@@ -155,6 +182,7 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
 
             continue
 
+        # FIXME: move to _best_split
         cmp_func = lambda a,b: cmp(X[a, best_j], X[b, best_j])
         indices[start_t:end_t] = sorted(indices[start_t:end_t], cmp=cmp_func)
 
