@@ -163,24 +163,21 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
             else:
                 tree.children_right[parent_t] = node_t
 
-        indices_t = indices[start_t:end_t]
-        mean_y_t = np.mean(y[indices_t])
+        y_hat_t = np.mean(y[indices[start_t:end_t]])
 
         N_t = end_t - start_t
 
         if depth_t == max_depth or N_t < min_samples_split:
-            tree.add_terminal_node(mean_y_t)
+            tree.add_terminal_node(y_hat_t)
             node_t += 1
             continue
 
         _best_split(X, y, indices, Xj, start_t, end_t, min_samples_leaf,
                     out_f8, out_i4)
-        best_thresh = out_f8[0]
-        best_j = out_i4[0]
-        pos_t = out_i4[1]
+        best_thresh, best_j, pos_t = out_f8[0], out_i4[0], out_i4[1]
 
         if best_j == -1:
-            tree.add_terminal_node(mean_y_t)
+            tree.add_terminal_node(y_hat_t)
             node_t += 1
             continue
 
@@ -190,7 +187,7 @@ def _fit(X, y, max_depth=3, min_samples_split=2, min_samples_leaf=1):
 
         tree.add_node(threshold=best_thresh,
                       feature=best_j,
-                      value=mean_y_t)
+                      value=y_hat_t)
 
         stack.append((start_t, pos_t, 1, depth_t + 1, node_t))
         stack.append((pos_t, end_t, 0, depth_t + 1, node_t))
