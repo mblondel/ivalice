@@ -1,4 +1,4 @@
-"""Regression trees"""
+"""Classification and regression trees"""
 
 # Author: Mathieu Blondel <mathieu@mblondel.org>
 # License: BSD 3 clause
@@ -358,7 +358,7 @@ class DecisionTreeClassifier(BaseEstimator, ClassifierMixin):
         nodes = np.empty(X.shape[0], dtype=np.int32)
         _apply(X, self.tree_.feature, self.tree_.threshold,
                self.tree_.children_left, self.tree_.children_right, nodes)
-        return self.tree_.value.take(nodes).astype(np.int32)
+        return self.tree_.value.take(nodes)
 
 
 class DecisionTreeRegressor(BaseEstimator, RegressorMixin):
