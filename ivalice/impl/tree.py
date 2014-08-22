@@ -254,7 +254,8 @@ def _best_split(X, y, indices, Xj, start_t, end_t, criterion,
         heapsort(Xj[start_t:end_t], indices[start_t:end_t], size_t)
 
 
-def _fit(X, y, criterion, max_depth=3, min_samples_split=2, min_samples_leaf=1):
+def _build(X, y, criterion, max_depth=3, min_samples_split=2,
+           min_samples_leaf=1):
     n_samples, n_features = X.shape
 
     # FIXME: pre-allocate stack?
@@ -268,10 +269,10 @@ def _fit(X, y, criterion, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     out_f8 = np.zeros(1, dtype=np.float64)
     out_i4 = np.zeros(2, dtype=np.int32)
 
-    # Classification case
-    if criterion >= GINI_CRITERION:
+    if criterion >= GINI_CRITERION:  # Classification case
         enc = LabelEncoder()
         y = enc.fit_transform(y).astype(np.float64)
+        # Arrays which will contain the number of samples in each class.
         count_L = np.zeros(len(enc.classes_), dtype=np.int32)
         count_R = np.zeros(len(enc.classes_), dtype=np.int32)
     else:
@@ -347,10 +348,10 @@ class DecisionTreeClassifier(BaseEstimator, ClassifierMixin):
                 "entropy": ENTROPY_CRITERION}[self.criterion]
 
     def fit(self, X, y):
-        self.tree_ = _fit(X, y, self._get_criterion(),
-                          max_depth=self.max_depth,
-                          min_samples_split=self.min_samples_split,
-                          min_samples_leaf=self.min_samples_leaf)
+        self.tree_ = _build(X, y, self._get_criterion(),
+                            max_depth=self.max_depth,
+                            min_samples_split=self.min_samples_split,
+                            min_samples_leaf=self.min_samples_leaf)
         self.tree_.value = self.tree_.value.astype(np.int32)
         return self
 
@@ -369,10 +370,10 @@ class DecisionTreeRegressor(BaseEstimator, RegressorMixin):
         self.min_samples_leaf = min_samples_leaf
 
     def fit(self, X, y):
-        self.tree_ = _fit(X, y, MSE_CRITERION,
-                          max_depth=self.max_depth,
-                          min_samples_split=self.min_samples_split,
-                          min_samples_leaf=self.min_samples_leaf)
+        self.tree_ = _build(X, y, MSE_CRITERION,
+                            max_depth=self.max_depth,
+                            min_samples_split=self.min_samples_split,
+                            min_samples_leaf=self.min_samples_leaf)
         return self
 
     def predict(self, X):
