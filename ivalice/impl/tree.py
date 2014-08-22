@@ -20,6 +20,7 @@ DOUBLE_MAX = np.finfo(np.float64).max
 
 MSE_CRITERION = 0
 GINI_CRITERION = 1
+ENTROPY_CRITERION = 2
 
 
 class Tree(object):
@@ -123,13 +124,10 @@ def _assign_classification(y, indices, start_t, end_t, buf):
         buf[idx] += 1
 
 
-@numba.njit("f8(f8[:], f8[:], i4[:], i4, i4, f8, i4[:], i4[:], i4)")
-def _impurity_gini(Xj, y, indices, start_t, end_t, s,
-                   count_L, count_R, min_samples_leaf):
+@numba.njit("i4(f8[:], f8[:], i4[:], i4, i4, f8, i4[:], i4[:])")
+def _compute_counts(Xj, y, indices, start_t, end_t, s, count_L, count_R):
     n_classes = count_L.shape[0]
-    N_t = end_t - start_t
     N_L = 0
-    N_R = 0
 
     for k in xrange(n_classes):
         count_L[k] = 0
@@ -137,13 +135,24 @@ def _impurity_gini(Xj, y, indices, start_t, end_t, s,
 
     for i in xrange(start_t, end_t):
         if Xj[i] > s:
-            N_R += 1
             idx = int(y[indices[i]])
             count_R[idx] += 1
         else:
             N_L += 1
             idx = int(y[indices[i]])
             count_L[idx] += 1
+
+    return N_L
+
+
+@numba.njit("f8(f8[:], f8[:], i4[:], i4, i4, f8, i4[:], i4[:], i4)")
+def _impurity_gini(Xj, y, indices, start_t, end_t, s,
+                   count_L, count_R, min_samples_leaf):
+    n_classes = count_L.shape[0]
+    N_t = end_t - start_t
+
+    N_L = _compute_counts(Xj, y, indices, start_t, end_t, s, count_L, count_R)
+    N_R = N_t - N_L
 
     if N_R < min_samples_leaf or N_L < min_samples_leaf:
         return DOUBLE_MAX
@@ -161,7 +170,35 @@ def _impurity_gini(Xj, y, indices, start_t, end_t, s,
     return N_L * gini_L + N_R * gini_R
 
 
-#@numba.njit("void(f8[:,:], f8[:], i4[:], f8[:], i4, i4, i4, i4, i4[:], i4[:], f8[:], i4[:])")
+@numba.njit("f8(f8[:], f8[:], i4[:], i4, i4, f8, i4[:], i4[:], i4)")
+def _impurity_entropy(Xj, y, indices, start_t, end_t, s,
+                      count_L, count_R, min_samples_leaf):
+    n_classes = count_L.shape[0]
+    N_t = end_t - start_t
+
+    N_L = _compute_counts(Xj, y, indices, start_t, end_t, s, count_L, count_R)
+    N_R = N_t - N_L
+
+    if N_R < min_samples_leaf or N_L < min_samples_leaf:
+        return DOUBLE_MAX
+
+    ent_L = 0
+    ent_R = 0
+    for k in xrange(n_classes):
+        proba_L = count_L[k] / float(N_t)
+        proba_R = count_R[k] / float(N_t)
+
+        if proba_L > 0:
+            ent_L -= proba_L * np.log2(proba_L)
+
+        if proba_R > 0:
+            ent_R -= proba_R * np.log2(proba_R)
+
+    #return float(N_L) / N_t * ent_L + float(N_R) / N_t * ent_R
+    return N_L * ent_L + N_R * ent_R
+
+
+@numba.njit("void(f8[:,:], f8[:], i4[:], f8[:], i4, i4, i4, i4, i4[:], i4[:], f8[:], i4[:])")
 def _best_split(X, y, indices, Xj, start_t, end_t, criterion,
                 min_samples_leaf, count_L, count_R, out_f8, out_i4):
     n_features = X.shape[1]
@@ -169,6 +206,7 @@ def _best_split(X, y, indices, Xj, start_t, end_t, criterion,
     best_imp = DOUBLE_MAX
     best_thresh = 0
     best_j = -1
+    pos_t = -1
 
     size_t = end_t - start_t
 
@@ -177,6 +215,7 @@ def _best_split(X, y, indices, Xj, start_t, end_t, criterion,
         for p in xrange(start_t, end_t):
             Xj[p] = X[indices[p], j]
 
+        # FIXME: use introsort.
         heapsort(Xj[start_t:end_t], indices[start_t:end_t], size_t)
 
         # FIXME: take care of duplicate feature values.
@@ -188,9 +227,12 @@ def _best_split(X, y, indices, Xj, start_t, end_t, criterion,
             if criterion == MSE_CRITERION:
                 imp = _impurity_mse(Xj, y, indices, start_t, end_t, thresh,
                                     min_samples_leaf)
-            else:
+            elif criterion == GINI_CRITERION:
                 imp = _impurity_gini(Xj, y, indices, start_t, end_t, thresh,
                                      count_L, count_R, min_samples_leaf)
+            else:
+                imp = _impurity_entropy(Xj, y, indices, start_t, end_t, thresh,
+                                        count_L, count_R, min_samples_leaf)
 
             if imp < best_imp:
                 best_imp = imp
@@ -212,17 +254,14 @@ def _best_split(X, y, indices, Xj, start_t, end_t, criterion,
         heapsort(Xj[start_t:end_t], indices[start_t:end_t], size_t)
 
 
-# TODO:
-# - implement introsort
-# - pre-allocate stack
-# - implement gini and entropy criteria
 def _fit(X, y, criterion, max_depth=3, min_samples_split=2, min_samples_leaf=1):
     n_samples, n_features = X.shape
 
-    indices = np.arange(n_samples).astype(np.int32)
+    # FIXME: pre-allocate stack?
     stack = [(0, n_samples, 0, 0, 0)]
     tree = Tree()
     node_t = 0
+    indices = np.arange(n_samples).astype(np.int32)
 
     # Buffers
     Xj = np.zeros(n_samples, dtype=np.float64)
@@ -296,17 +335,23 @@ def _fit(X, y, criterion, max_depth=3, min_samples_split=2, min_samples_leaf=1):
 
 class DecisionTreeClassifier(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, max_depth=None, min_samples_split=2, min_samples_leaf=1):
+    def __init__(self, criterion="gini", max_depth=None, min_samples_split=2,
+                 min_samples_leaf=1):
+        self.criterion = criterion
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
 
+    def _get_criterion(self):
+        return {"gini": GINI_CRITERION,
+                "entropy": ENTROPY_CRITERION}[self.criterion]
+
     def fit(self, X, y):
-        self.tree_ = _fit(X, y, GINI_CRITERION,
+        self.tree_ = _fit(X, y, self._get_criterion(),
                           max_depth=self.max_depth,
                           min_samples_split=self.min_samples_split,
                           min_samples_leaf=self.min_samples_leaf)
-        #self.tree_.value = self.tree_.value.astype(np.int32)
+        self.tree_.value = self.tree_.value.astype(np.int32)
         return self
 
     def predict(self, X):

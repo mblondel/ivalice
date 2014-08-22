@@ -83,22 +83,23 @@ def test_mse_max_depth_min_samples():
     assert_almost_equal(sk, iv)
 
 
-def test_gini_max_depth():
-    sk = 0
-    iv = 0
+def test_classif_max_depth():
+    for criterion in ("gini", "entropy"):
+        sk = 0
+        iv = 0
 
-    for X, y in _make_classification_datasets(10):
-        clf = skDecisionTreeClassifier(max_depth=5)
-        clf.fit(X, y)
-        y_pred = clf.predict(X)
-        sk += np.mean(y == y_pred)
+        for X, y in _make_classification_datasets(10):
+            clf = skDecisionTreeClassifier(criterion=criterion, max_depth=5)
+            clf.fit(X, y)
+            y_pred = clf.predict(X)
+            sk += np.mean(y == y_pred)
 
-        clf = DecisionTreeClassifier(max_depth=5)
-        clf.fit(X, y)
-        y_pred = clf.predict(X)
-        iv += np.mean(y == y_pred)
+            clf = DecisionTreeClassifier(criterion=criterion, max_depth=5)
+            clf.fit(X, y)
+            y_pred = clf.predict(X)
+            iv += np.mean(y == y_pred)
 
-    sk /= 10
-    iv /= 10
+        sk /= 10
+        iv /= 10
 
     assert_almost_equal(sk, iv)
