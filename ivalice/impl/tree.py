@@ -246,8 +246,6 @@ def _best_split(X, y, samples, features, Xj, start_t, end_t, criterion,
     out_i4[0] = best_j
     out_i4[1] = pos_t
 
-    best_j = out_i4[0]  # workaround some bug in Numba
-
     if best_j != -1:
         # Reorder samples for the best split.
         for p in xrange(start_t, end_t):
