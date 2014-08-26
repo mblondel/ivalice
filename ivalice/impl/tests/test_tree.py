@@ -83,6 +83,33 @@ def test_mse_max_depth_min_samples():
     assert_almost_equal(sk, iv)
 
 
+def test_mse_max_depth_max_features():
+    sk = 0
+    iv = 0
+
+    n_times = 30
+    for X, y in _make_regression_datasets(n_times):
+        reg = skDecisionTreeRegressor(max_depth=5,
+                                      max_features=4,
+                                      random_state=0)
+        reg.fit(X, y)
+        y_pred = reg.predict(X)
+        sk += np.mean((y - y_pred) ** 2)
+
+        reg = DecisionTreeRegressor(max_depth=5,
+                                    max_features=4,
+                                    random_state=0)
+        reg.fit(X, y)
+        y_pred = reg.predict(X)
+        iv += np.mean((y - y_pred) ** 2)
+
+    sk /= n_times
+    iv /= n_times
+
+    assert_almost_equal(sk, 405.5, 1)
+    assert_almost_equal(iv, 394.8, 1)
+
+
 def test_classif_max_depth():
     for criterion in ("gini", "entropy"):
         sk = 0
