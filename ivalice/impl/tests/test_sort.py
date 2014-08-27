@@ -21,6 +21,12 @@ def test_quicksort():
     assert_array_equal(sorted_indices, indices)
 
 
+def test_quicksort_one():
+    values = np.arange(1).astype(np.float64)
+    indices = np.arange(1).astype(np.int32)
+    quicksort(values, indices, 0, len(values) - 1)
+
+
 def test_heapsort():
     rng = np.random.RandomState(0)
     values = rng.rand(500)
@@ -34,3 +40,9 @@ def test_heapsort():
 
     assert_array_equal(sorted_values, values)
     assert_array_equal(sorted_indices, indices)
+
+
+def test_heapsort_one():
+    values = np.arange(1).astype(np.float64)
+    indices = np.arange(1).astype(np.int32)
+    heapsort(values, indices, len(values))

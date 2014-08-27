@@ -124,18 +124,20 @@ def _sift_down(values, indices, start, end):
 
 @numba.njit("void(f8[:], i4[:], i4)")
 def heapsort(values, indices, size):
-    # heapify
-    start = (size - 2) / 2
-    end = size
-    while True:
-        _sift_down(values, indices, start, end)
-        if start == 0:
-            break
-        start -= 1
+    if size > 1:
+        # Heapify.
+        start = (size - 2) / 2
+        end = size
+        while True:
+            _sift_down(values, indices, start, end)
+            if start == 0:
+                break
+            start -= 1
 
-    # sort by shrinking the heap, putting the max element immediately after it
-    end = size - 1
-    while end > 0:
-        _dual_swap(values, indices, 0, end)
-        _sift_down(values, indices, 0, end)
-        end -= 1
+        # Sort by shrinking the heap, putting the max element
+        # immediately after it.
+        end = size - 1
+        while end > 0:
+            _dual_swap(values, indices, 0, end)
+            _sift_down(values, indices, 0, end)
+            end -= 1
