@@ -217,11 +217,14 @@ def _best_split(X, y, samples, features, Xj, start_t, end_t, criterion,
         for p in xrange(start_t, end_t):
             Xj[p] = X[samples[p], j]
 
-        # FIXME: use introsort.
+        # Sort samples in nodes_t by their value for feature j.
         heapsort(Xj[start_t:end_t], samples[start_t:end_t], size_t)
+        # FIXME: use introsort.
 
         # FIXME: take care of duplicate feature values.
         for k in xrange(start_t, end_t - 1):
+            # Choose splitting threshold.
+            # Any value between Xj[k+1] and Xj[k] is fine.
             thresh = (Xj[k + 1] - Xj[k]) / 2.0 + Xj[k]
 
             # FIXME: impurity can be computed efficiently from last
@@ -254,8 +257,8 @@ def _best_split(X, y, samples, features, Xj, start_t, end_t, criterion,
         heapsort(Xj[start_t:end_t], samples[start_t:end_t], size_t)
 
 
-def _build(X, y, criterion, max_features=None, max_depth=3, min_samples_split=2,
-           min_samples_leaf=1, random_state=None):
+def _build_tree(X, y, criterion, max_features=None, max_depth=3,
+                min_samples_split=2, min_samples_leaf=1, random_state=None):
     n_samples, n_features = X.shape
 
     # FIXME: pre-allocate stack?
@@ -374,12 +377,12 @@ class DecisionTreeClassifier(_BaseTree, ClassifierMixin):
 
     def fit(self, X, y):
         rng = check_random_state(self.random_state)
-        self.tree_ = _build(X, y, self._get_criterion(),
-                            max_features=self._get_max_features(X),
-                            max_depth=self.max_depth,
-                            min_samples_split=self.min_samples_split,
-                            min_samples_leaf=self.min_samples_leaf,
-                            random_state=rng)
+        self.tree_ = _build_tree(X, y, self._get_criterion(),
+                                 max_features=self._get_max_features(X),
+                                 max_depth=self.max_depth,
+                                 min_samples_split=self.min_samples_split,
+                                 min_samples_leaf=self.min_samples_leaf,
+                                 random_state=rng)
         self.tree_.value = self.tree_.value.astype(np.int32)
         return self
 
@@ -402,12 +405,12 @@ class DecisionTreeRegressor(_BaseTree, RegressorMixin):
 
     def fit(self, X, y):
         rng = check_random_state(self.random_state)
-        self.tree_ = _build(X, y, MSE_CRITERION,
-                            max_features=self._get_max_features(X),
-                            max_depth=self.max_depth,
-                            min_samples_split=self.min_samples_split,
-                            min_samples_leaf=self.min_samples_leaf,
-                            random_state=rng)
+        self.tree_ = _build_tree(X, y, MSE_CRITERION,
+                                 max_features=self._get_max_features(X),
+                                 max_depth=self.max_depth,
+                                 min_samples_split=self.min_samples_split,
+                                 min_samples_leaf=self.min_samples_leaf,
+                                 random_state=rng)
         return self
 
     def predict(self, X):
