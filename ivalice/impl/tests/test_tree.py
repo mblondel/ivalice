@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.tree import DecisionTreeRegressor as skDecisionTreeRegressor
 from sklearn.tree import DecisionTreeClassifier as skDecisionTreeClassifier
 from sklearn.datasets import make_regression
-from sklearn.datasets import load_iris
+from sklearn.datasets import make_classification
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import accuracy_score
@@ -25,17 +25,20 @@ def _make_regression_datasets(n_times, sw=False):
 
 
 def _make_classification_datasets(n_times, sw=False):
-    iris = load_iris()
-    X, y = iris.data, iris.target
     for n in xrange(n_times):
-        rng = np.random.RandomState(n)
-        ind = rng.permutation(X.shape[0])[:20]
+        X, y = make_classification(n_samples=20,
+                                   n_features=10,
+                                   n_informative=10,
+                                   n_redundant=0,
+                                   n_classes=3,
+                                   random_state=n)
         if sw:
-            w = np.round(rng.rand(ind.shape[0]))
+            rng = np.random.RandomState(n)
+            w = np.round(rng.rand(X.shape[0]))
             w[w <= 0.5] = 0.0
-            yield X[ind], y[ind], w
+            yield X, y, w
         else:
-            yield X[ind], y[ind]
+            yield X, y
 
 
 def test_mse_fully_developed():

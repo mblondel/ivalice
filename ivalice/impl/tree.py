@@ -83,21 +83,22 @@ def _assign_mse(y, sample_weight, samples, start_t, end_t):
     return s / N_t
 
 
-@numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, f8, f8[:])")
-def _impurity_mse(Xj, y, sample_weight, samples, start_t, end_t, s, out_f8):
+@numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, i4, f8[:])")
+def _impurity_mse(Xj, y, sample_weight, samples, start_t, pos_t, end_t, out_f8):
     N_L = 0
     N_R = 0
     y_hat_L = 0
     y_hat_R = 0
 
-    for ii in xrange(start_t, end_t):
+    for ii in xrange(start_t, pos_t):
         i = samples[ii]
-        if Xj[ii] > s:
-            N_R += sample_weight[i]
-            y_hat_R += y[i] * sample_weight[i]
-        else:
-            N_L += sample_weight[i]
-            y_hat_L += y[i] * sample_weight[i]
+        N_L += sample_weight[i]
+        y_hat_L += y[i] * sample_weight[i]
+
+    for ii in xrange(pos_t, end_t):
+        i = samples[ii]
+        N_R += sample_weight[i]
+        y_hat_R += y[i] * sample_weight[i]
 
     N_t = N_L + N_R
 
@@ -110,12 +111,13 @@ def _impurity_mse(Xj, y, sample_weight, samples, start_t, end_t, s, out_f8):
     err_L = 0
     err_R = 0
 
-    for ii in xrange(start_t, end_t):
+    for ii in xrange(start_t, pos_t):
         i = samples[ii]
-        if Xj[ii] > s:
-            err_R += sample_weight[i] * ((y[i] - y_hat_R) ** 2)
-        else:
-            err_L += sample_weight[i] * ((y[i] - y_hat_L) ** 2)
+        err_L += sample_weight[i] * ((y[i] - y_hat_L) ** 2)
+
+    for ii in xrange(pos_t, end_t):
+        i = samples[ii]
+        err_R += sample_weight[i] * ((y[i] - y_hat_R) ** 2)
 
     out_f8[0] = N_L
     out_f8[1] = N_R
@@ -138,7 +140,7 @@ def _assign_classification(y, sample_weight, samples, start_t, end_t, buf):
 
 
 @numba.njit("void(f8[:], f8[:], f8[:], i4[:], i4, i4, f8, f8[:], f8[:], f8[:])")
-def _compute_counts(Xj, y, sample_weight, samples, start_t, end_t, s,
+def _compute_counts(Xj, y, sample_weight, samples, start_t, pos_t, end_t,
                     count_L, count_R, out_f8):
     n_classes = count_L.shape[0]
     N_L = 0
@@ -148,28 +150,29 @@ def _compute_counts(Xj, y, sample_weight, samples, start_t, end_t, s,
         count_L[k] = 0
         count_R[k] = 0
 
-    for ii in xrange(start_t, end_t):
+    for ii in xrange(start_t, pos_t):
         i = samples[ii]
-        if Xj[ii] > s:
-            N_R += sample_weight[i]
-            idx = int(y[i])
-            count_R[idx] += sample_weight[i]
-        else:
-            N_L += sample_weight[i]
-            idx = int(y[i])
-            count_L[idx] += sample_weight[i]
+        N_L += sample_weight[i]
+        idx = int(y[i])
+        count_L[idx] += sample_weight[i]
+
+    for ii in xrange(pos_t, end_t):
+        i = samples[ii]
+        N_R += sample_weight[i]
+        idx = int(y[i])
+        count_R[idx] += sample_weight[i]
 
     out_f8[0] = N_L
     out_f8[1] = N_R
     out_f8[2] = N_L + N_R
 
 
-@numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, f8, f8[:], f8[:], f8[:])")
-def _impurity_gini(Xj, y, sample_weight, samples, start_t, end_t, s,
+@numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, i4, f8[:], f8[:], f8[:])")
+def _impurity_gini(Xj, y, sample_weight, samples, start_t, pos_t, end_t,
                    count_L, count_R, out_f8):
     n_classes = count_L.shape[0]
 
-    _compute_counts(Xj, y, sample_weight, samples, start_t, end_t, s,
+    _compute_counts(Xj, y, sample_weight, samples, start_t, pos_t, end_t,
                     count_L, count_R, out_f8)
     N_L = out_f8[0]
     N_R = out_f8[1]
@@ -191,12 +194,12 @@ def _impurity_gini(Xj, y, sample_weight, samples, start_t, end_t, s,
     return N_L * gini_L + N_R * gini_R
 
 
-@numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, f8, f8[:], f8[:], f8[:])")
-def _impurity_entropy(Xj, y, sample_weight, samples, start_t, end_t, s,
+@numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, i4, f8[:], f8[:], f8[:])")
+def _impurity_entropy(Xj, y, sample_weight, samples, start_t, pos_t, end_t,
                       count_L, count_R, out_f8):
     n_classes = count_L.shape[0]
 
-    _compute_counts(Xj, y, sample_weight, samples, start_t, end_t, s,
+    _compute_counts(Xj, y, sample_weight, samples, start_t, pos_t, end_t,
                     count_L, count_R, out_f8)
     N_L = out_f8[0]
     N_R = out_f8[1]
@@ -228,7 +231,7 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
     best_imp = DOUBLE_MAX
     best_thresh = 0.0
     best_j = -1
-    pos_t = -1
+    best_pos_t = -1
     N_L = 0.0
     N_R = 0.0
     N_t = 0.0
@@ -246,7 +249,8 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
 
         # FIXME: take care of duplicate feature values.
         for k in xrange(start_t, end_t - 1):
-            N_L = 1 + k - start_t
+            pos_t = k + 1
+            N_L = pos_t - start_t
             N_R = size_t - N_L
 
             if N_R < min_samples_leaf or N_L < min_samples_leaf:
@@ -260,19 +264,19 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
             # iteration.
             if criterion == MSE_CRITERION:
                 imp = _impurity_mse(Xj, y, sample_weight, samples, start_t,
-                                    end_t, thresh, out_f8)
+                                    pos_t, end_t, out_f8)
             elif criterion == GINI_CRITERION:
                 imp = _impurity_gini(Xj, y, sample_weight, samples, start_t,
-                                     end_t, thresh, count_L, count_R, out_f8)
+                                     pos_t, end_t, count_L, count_R, out_f8)
             else:
                 imp = _impurity_entropy(Xj, y, sample_weight, samples, start_t,
-                                        end_t, thresh, count_L, count_R, out_f8)
+                                        pos_t, end_t, count_L, count_R, out_f8)
 
             if imp < best_imp:
                 best_imp = imp
                 best_thresh = thresh
                 best_j = j
-                pos_t = k + 1
+                best_pos_t = pos_t
                 N_L = out_f8[0]
                 N_R = out_f8[1]
                 N_t = out_f8[2]
@@ -282,7 +286,7 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
     out_f8[2] = N_t
     out_f8[3] = best_thresh
     out_f8[4] = best_j
-    out_f8[5] = pos_t
+    out_f8[5] = best_pos_t
 
     if best_j != -1:
         # Reorder samples for the best split.
