@@ -155,12 +155,14 @@ def test_classif_max_depth():
         iv = 0
 
         for X, y in _make_classification_datasets(10):
-            clf = skDecisionTreeClassifier(criterion=criterion, max_depth=5)
+            clf = skDecisionTreeClassifier(criterion=criterion, max_depth=5,
+                                           random_state=1)
             clf.fit(X, y)
             y_pred = clf.predict(X)
             sk += np.mean(y == y_pred)
 
-            clf = DecisionTreeClassifier(criterion=criterion, max_depth=5)
+            clf = DecisionTreeClassifier(criterion=criterion, max_depth=5,
+                                         random_state=1)
             clf.fit(X, y)
             y_pred = clf.predict(X)
             iv += np.mean(y == y_pred)

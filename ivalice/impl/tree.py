@@ -87,43 +87,44 @@ def _assign_mse(y, sample_weight, samples, start_t, end_t):
 def _impurity_mse(Xj, y, sample_weight, samples, start_t, pos_t, end_t, out_f8):
     N_L = 0
     N_R = 0
-    y_hat_L = 0
-    y_hat_R = 0
+
+    y_sq = 0
+    y_sum = 0
 
     for ii in xrange(start_t, pos_t):
         i = samples[ii]
         N_L += sample_weight[i]
-        y_hat_L += y[i] * sample_weight[i]
+        y_sq += sample_weight[i] * y[i] * y[i]
+        y_sum += sample_weight[i] * y[i]
+
+    if N_L == 0:
+        return DOUBLE_MAX
+
+    y_hat_L = y_sum / N_L
+    imp_L = y_sq - 1 * y_sum * y_sum / N_L
+
+    y_sq = 0
+    y_sum = 0
 
     for ii in xrange(pos_t, end_t):
         i = samples[ii]
         N_R += sample_weight[i]
-        y_hat_R += y[i] * sample_weight[i]
+        y_sq += sample_weight[i] * y[i] * y[i]
+        y_sum += sample_weight[i] * y[i]
 
-    N_t = N_L + N_R
-
-    if N_L == 0 or N_R == 0:
+    if N_R == 0:
         return DOUBLE_MAX
 
-    y_hat_L /= N_L
-    y_hat_R /= N_R
+    y_hat_R = y_sum / N_R
+    imp_R = y_sq - 1 * y_sum * y_sum / N_R
 
-    err_L = 0
-    err_R = 0
-
-    for ii in xrange(start_t, pos_t):
-        i = samples[ii]
-        err_L += sample_weight[i] * ((y[i] - y_hat_L) ** 2)
-
-    for ii in xrange(pos_t, end_t):
-        i = samples[ii]
-        err_R += sample_weight[i] * ((y[i] - y_hat_R) ** 2)
+    N_t = N_L + N_R
 
     out_f8[0] = N_L
     out_f8[1] = N_R
     out_f8[2] = N_t
 
-    return (err_L + err_R) / N_t
+    return (imp_L + imp_R) / N_t
 
 
 @numba.njit("void(f8[:], f8[:], i4[:], i4, i4, f8[:])")
