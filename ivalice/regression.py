@@ -1,2 +1,3 @@
-from .impl.tree import DecisionTreeRegressor
+from .impl.forest import RFRegressor
 from .impl.gradient_boosting import GBRegressor
+from .impl.tree import DecisionTreeRegressor
