@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.base import RegressorMixin
 from sklearn.utils import check_random_state
 
-from .tree import DecisionTreeRegressor
+from .tree import TreeRegressor
 
 
 MAX_INT = np.iinfo(np.int32).max
@@ -64,10 +64,10 @@ class RFRegressor(_BaseRF, RegressorMixin):
         self.random_state = random_state
 
     def fit(self, X, y, sample_weight=None):
-        tree = DecisionTreeRegressor(max_features=self.max_features,
-                                     max_depth=self.max_depth,
-                                     min_samples_split=self.min_samples_split,
-                                     min_samples_leaf=self.min_samples_leaf)
+        tree = TreeRegressor(max_features=self.max_features,
+                             max_depth=self.max_depth,
+                             min_samples_split=self.min_samples_split,
+                             min_samples_leaf=self.min_samples_leaf)
         return self._fit(X, y, sample_weight, tree)
 
     def predict(self, X):

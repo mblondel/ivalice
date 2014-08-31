@@ -406,7 +406,7 @@ class _BaseTree(BaseEstimator):
         return max_features
 
 
-class DecisionTreeClassifier(_BaseTree, ClassifierMixin):
+class TreeClassifier(_BaseTree, ClassifierMixin):
 
     def __init__(self, criterion="gini", max_features=None, max_depth=None,
                  min_samples_split=2, min_samples_leaf=1, random_state=None):
@@ -444,7 +444,7 @@ class DecisionTreeClassifier(_BaseTree, ClassifierMixin):
         return self.tree_.value.take(nodes)
 
 
-class DecisionTreeRegressor(_BaseTree, RegressorMixin):
+class TreeRegressor(_BaseTree, RegressorMixin):
 
     def __init__(self, max_features=None, max_depth=None, min_samples_split=2,
                  min_samples_leaf=1, random_state=None):
