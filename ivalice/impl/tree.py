@@ -72,17 +72,6 @@ def _apply(X, feature, threshold, children_left, children_right, out):
         out[i] = node
 
 
-@numba.njit("f8(f8[:], f8[:], i4[:], i4, i4)")
-def _assign_mse(y, sample_weight, samples, start_t, end_t):
-    N_t = 0
-    s = 0
-    for ii in xrange(start_t, end_t):
-        i = samples[ii]
-        s += y[i] * sample_weight[i]
-        N_t += sample_weight[i]
-    return s / N_t
-
-
 @numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, i4, f8[:])")
 def _impurity_mse(Xj, y, sample_weight, samples, start_t, pos_t, end_t, out_f8):
     N_L = 0
@@ -100,7 +89,7 @@ def _impurity_mse(Xj, y, sample_weight, samples, start_t, pos_t, end_t, out_f8):
     if N_L == 0:
         return DOUBLE_MAX
 
-    y_hat_L = y_sum / N_L
+    value_L = y_sum / N_L
     imp_L = y_sq - 1 * y_sum * y_sum / N_L
 
     y_sq = 0
@@ -115,7 +104,7 @@ def _impurity_mse(Xj, y, sample_weight, samples, start_t, pos_t, end_t, out_f8):
     if N_R == 0:
         return DOUBLE_MAX
 
-    y_hat_R = y_sum / N_R
+    value_R = y_sum / N_R
     imp_R = y_sq - 1 * y_sum * y_sum / N_R
 
     N_t = N_L + N_R
@@ -123,21 +112,10 @@ def _impurity_mse(Xj, y, sample_weight, samples, start_t, pos_t, end_t, out_f8):
     out_f8[0] = N_L
     out_f8[1] = N_R
     out_f8[2] = N_t
+    out_f8[3] = value_L
+    out_f8[4] = value_R
 
     return (imp_L + imp_R) / N_t
-
-
-@numba.njit("void(f8[:], f8[:], i4[:], i4, i4, f8[:])")
-def _assign_classification(y, sample_weight, samples, start_t, end_t, buf):
-    n_classes = buf.shape[0]
-
-    for k in xrange(n_classes):
-        buf[k] = 0
-
-    for ii in xrange(start_t, end_t):
-        i = samples[ii]
-        idx = int(y[i])
-        buf[idx] += sample_weight[i]
 
 
 @numba.njit("void(f8[:], f8[:], f8[:], i4[:], i4, i4, f8, f8[:], f8[:], f8[:])")
@@ -163,9 +141,25 @@ def _compute_counts(Xj, y, sample_weight, samples, start_t, pos_t, end_t,
         idx = int(y[i])
         count_R[idx] += sample_weight[i]
 
+    best_L = -DOUBLE_MAX
+    best_R = -DOUBLE_MAX
+    value_L = 0
+    value_R = 0
+
+    for k in xrange(n_classes):
+        if count_L[k] > best_L:
+            best_L = count_L[k]
+            value_L = k
+
+        if count_R[k] > best_R:
+            best_R = count_R[k]
+            value_R = k
+
     out_f8[0] = N_L
     out_f8[1] = N_R
     out_f8[2] = N_L + N_R
+    out_f8[3] = value_L
+    out_f8[4] = value_R
 
 
 @numba.njit("f8(f8[:], f8[:], f8[:], i4[:], i4, i4, i4, f8[:], f8[:], f8[:])")
@@ -236,6 +230,8 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
     N_L = 0.0
     N_R = 0.0
     N_t = 0.0
+    value_L = 0.0
+    value_R = 0.0
 
     size_t = end_t - start_t
 
@@ -285,13 +281,17 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
                 N_L = out_f8[0]
                 N_R = out_f8[1]
                 N_t = out_f8[2]
+                value_L = out_f8[3]
+                value_R = out_f8[4]
 
     out_f8[0] = N_L
     out_f8[1] = N_R
     out_f8[2] = N_t
-    out_f8[3] = best_thresh
-    out_f8[4] = best_j
-    out_f8[5] = best_pos_t
+    out_f8[3] = value_L
+    out_f8[4] = value_R
+    out_f8[5] = best_thresh
+    out_f8[6] = best_j
+    out_f8[7] = best_pos_t
 
     if best_j != -1:
         # Reorder samples for the best split.
@@ -311,11 +311,11 @@ def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
     samples = np.arange(n_samples).astype(np.int32)
     samples = samples[sample_weight > 0]
     features = np.arange(n_features).astype(np.int32)
-    stack = [(0, len(samples), 0, 0, np.sum(sample_weight), 0)]
+    stack = [(0, len(samples), 0, 0, np.sum(sample_weight), 0, 0)]
 
     # Buffers
     Xj = np.zeros(n_samples, dtype=np.float64)
-    out_f8 = np.zeros(6, dtype=np.float64)
+    out_f8 = np.zeros(8, dtype=np.float64)
 
     if criterion >= GINI_CRITERION:  # Classification case
         enc = LabelEncoder()
@@ -329,7 +329,7 @@ def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
 
     while len(stack) > 0:
         # Pick node from the stack.
-        start_t, end_t, left_t, depth_t, N_t, parent_t = stack.pop()
+        start_t, end_t, left_t, depth_t, N_t, value_t, parent_t = stack.pop()
 
         if node_t > 0:
             # Adjust children node id of parent.
@@ -338,19 +338,11 @@ def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
             else:
                 tree.children_right[parent_t] = node_t
 
-        # Node value.
-        if criterion == MSE_CRITERION:
-            y_hat_t = _assign_mse(y, sample_weight, samples, start_t, end_t)
-        else:
-            _assign_classification(y, sample_weight, samples, start_t, end_t,
-                                   count_L)
-            y_hat_t = np.argmax(count_L)
-
         size_t = end_t - start_t
 
         # Terminal node if max_depth or min_samples_split conditions are met.
         if depth_t == max_depth or size_t < min_samples_split:
-            tree.add_terminal_node(y_hat_t)
+            tree.add_terminal_node(value_t)
             node_t += 1
             continue
 
@@ -361,29 +353,30 @@ def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
         _best_split(X, y, sample_weight, samples, features[:max_features], Xj,
                     start_t, end_t, criterion, min_samples_leaf,
                     count_L, count_R, out_f8)
-        N_L, N_R, _, best_thresh, best_j, pos_t = out_f8
+        N_L, N_R, _, value_L, value_R, best_thresh, best_j, pos_t = out_f8
         best_j = int(best_j)
         pos_t = int(pos_t)
 
         # No best split found: terminal node.
         if best_j == -1:
-            tree.add_terminal_node(y_hat_t)
+            tree.add_terminal_node(value_t)
             node_t += 1
             continue
 
         # Add node to the tree.
         tree.add_node(threshold=best_thresh,
                       feature=best_j,
-                      value=y_hat_t)
+                      value=value_t)
 
         # Add left and right children to the stack.
-        stack.append((start_t, pos_t, 1, depth_t + 1, N_L, node_t))
-        stack.append((pos_t, end_t, 0, depth_t + 1, N_R, node_t))
+        stack.append((start_t, pos_t, 1, depth_t + 1, N_L, value_L, node_t))
+        stack.append((pos_t, end_t, 0, depth_t + 1, N_R, value_R, node_t))
 
         node_t += 1
 
     if criterion >= GINI_CRITERION:
-        tree.value = enc.inverse_transform(tree.value)
+        values = np.array(tree.value, dtype=np.int32)
+        tree.value = enc.inverse_transform(values)
 
     return tree.finalize()
 
