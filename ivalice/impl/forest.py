@@ -64,6 +64,9 @@ class RFRegressor(_BaseRF, RegressorMixin):
         self.random_state = random_state
 
     def fit(self, X, y, sample_weight=None):
+        X = np.array(X, dtype=np.float64)
+        y = np.array(y, dtype=np.float64)
+
         tree = TreeRegressor(max_features=self.max_features,
                              max_depth=self.max_depth,
                              min_samples_split=self.min_samples_split,
