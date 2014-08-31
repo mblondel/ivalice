@@ -263,7 +263,7 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
             if Xj_diff == 0:
                 continue
 
-            thresh = (Xj[k + 1] - Xj[k]) / 2.0 + Xj[k]
+            thresh = Xj_diff / 2.0 + Xj[k]
 
             # FIXME: impurity can be computed efficiently from last
             # iteration.
