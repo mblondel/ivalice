@@ -248,7 +248,6 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
         heapsort(Xj[start_t:end_t], samples[start_t:end_t], size_t)
         # FIXME: use introsort.
 
-        # FIXME: take care of duplicate feature values.
         for k in xrange(start_t, end_t - 1):
             pos_t = k + 1
             N_L = pos_t - start_t
@@ -259,6 +258,11 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
 
             # Choose splitting threshold.
             # Any value between Xj[k+1] and Xj[k] is fine.
+            Xj_diff = Xj[k + 1] - Xj[k]
+
+            if Xj_diff == 0:
+                continue
+
             thresh = (Xj[k + 1] - Xj[k]) / 2.0 + Xj[k]
 
             # FIXME: impurity can be computed efficiently from last
