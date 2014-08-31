@@ -26,37 +26,69 @@ GINI_CRITERION = 1
 ENTROPY_CRITERION = 2
 
 
-class Tree(object):
+class _Tree(object):
 
-    def __init__(self):
-        self.threshold = []
-        self.feature = []
-        self.value = []
-        self.children_left = []
-        self.children_right = []
+    def __init__(self, capacity=2 ** 10):
+        self.capacity = capacity
+        self.threshold = np.zeros(capacity, dtype=np.float64) + UNDEFINED
+        self.feature = np.zeros(capacity, dtype=np.int32) + UNDEFINED
+        self.children_left = np.zeros(capacity, dtype=np.int32) + TREE_LEAF
+        self.children_right = np.zeros(capacity, dtype=np.int32) + TREE_LEAF
+        self.value = np.zeros(capacity, dtype=np.float64)
+        self.ptr = 0
 
-    def add_node(self, threshold, feature, value,
-                 child_left=0, child_right=0):
-        self.threshold.append(threshold)
-        self.feature.append(feature)
-        self.value.append(value)
-        self.children_left.append(child_left)
-        self.children_right.append(child_right)
+    def add_node(self, threshold, feature, value):
+        self.threshold[self.ptr] = threshold
+        self.feature[self.ptr] = feature
+        self.value[self.ptr] = value
+        self.ptr += 1
 
     def add_terminal_node(self, value):
-        self.threshold.append(UNDEFINED)
-        self.feature.append(UNDEFINED)
-        self.value.append(value)
-        self.children_left.append(TREE_LEAF)
-        self.children_right.append(TREE_LEAF)
+        self.value[self.ptr] = value
+        self.ptr += 1
 
     def finalize(self):
-        self.threshold = np.array(self.threshold, dtype=np.float64)
-        self.feature = np.array(self.feature, dtype=np.int32)
-        self.value = np.array(self.value, dtype=np.float64)
-        self.children_left = np.array(self.children_left, dtype=np.int32)
-        self.children_right = np.array(self.children_right, dtype=np.int32)
+        for attr in ("threshold", "feature", "value",
+                     "children_left", "children_right"):
+            attr_value = getattr(self, attr)[:self.ptr + 1]
+            setattr(self, attr, attr_value)
         return self
+
+
+class _Stack(object):
+
+    def __init__(self, capacity=2 ** 10):
+        self.capacity = capacity
+        self.start = np.zeros(capacity, dtype=np.int32)
+        self.end = np.zeros(capacity, dtype=np.int32)
+        self.left = np.zeros(capacity, dtype=bool)
+        self.depth = np.zeros(capacity, dtype=np.int32)
+        self.n_samples = np.zeros(capacity, dtype=np.float64)
+        self.parent = np.zeros(capacity, dtype=np.int32)
+        self.value = np.zeros(capacity, dtype=np.float64)
+        self.ptr = -1
+
+    def push(self, start, end, left, depth, n_samples, parent, value):
+        if self.ptr >= self.capacity:
+            raise ValueError("Stack overflow!")
+
+        self.ptr += 1
+        self.start[self.ptr] = start
+        self.end[self.ptr] = end
+        self.left[self.ptr] = left
+        self.depth[self.ptr] = depth
+        self.n_samples[self.ptr] = n_samples
+        self.parent[self.ptr] = parent
+        self.value[self.ptr] = value
+
+    def pop(self):
+        self.ptr -= 1
+        p = self.ptr + 1
+        return self.start[p], self.end[p], self.left[p], self.depth[p], \
+               self.n_samples[p], self.parent[p], self.value[p]
+
+    def __len__(self):
+        return self.ptr + 1
 
 
 @numba.njit("void(f8[:,:], i4[:], f8[:], i4[:], i4[:], i4[:])")
@@ -301,17 +333,21 @@ def _best_split(X, y, sample_weight, samples, features, Xj, start_t, end_t,
         heapsort(Xj[start_t:end_t], samples[start_t:end_t], size_t)
 
 
-def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
-                min_samples_split=2, min_samples_leaf=1, random_state=None):
+def _build_tree(X, y, sample_weight, criterion, max_features=None,
+                max_depth=None, min_samples_split=2, min_samples_leaf=1,
+                random_state=None):
     n_samples, n_features = X.shape
 
-    # FIXME: pre-allocate stack?
-    tree = Tree()
+    tree = _Tree()
     node_t = 0
     samples = np.arange(n_samples).astype(np.int32)
     samples = samples[sample_weight > 0]
     features = np.arange(n_features).astype(np.int32)
-    stack = [(0, len(samples), 0, 0, np.sum(sample_weight), 0, 0)]
+
+    stack = _Stack()
+    stack.push(start=0, end=len(samples), left=False,
+               depth=0, n_samples=np.sum(sample_weight),
+               parent=0, value=0)
 
     # Buffers
     Xj = np.zeros(n_samples, dtype=np.float64)
@@ -329,7 +365,7 @@ def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
 
     while len(stack) > 0:
         # Pick node from the stack.
-        start_t, end_t, left_t, depth_t, N_t, value_t, parent_t = stack.pop()
+        start_t, end_t, left_t, depth_t, N_t, parent_t, value_t = stack.pop()
 
         if node_t > 0:
             # Adjust children node id of parent.
@@ -364,13 +400,13 @@ def _build_tree(X, y, sample_weight, criterion, max_features=None, max_depth=3,
             continue
 
         # Add node to the tree.
-        tree.add_node(threshold=best_thresh,
-                      feature=best_j,
-                      value=value_t)
+        tree.add_node(threshold=best_thresh, feature=best_j, value=value_t)
 
         # Add left and right children to the stack.
-        stack.append((start_t, pos_t, 1, depth_t + 1, N_L, value_L, node_t))
-        stack.append((pos_t, end_t, 0, depth_t + 1, N_R, value_R, node_t))
+        stack.push(start=start_t, end=pos_t, left=True, depth=depth_t + 1,
+                   n_samples=N_L, parent=node_t, value=value_L)
+        stack.push(start=pos_t, end=end_t, left=False, depth=depth_t + 1,
+                   n_samples=N_R, parent=node_t, value=value_R)
 
         node_t += 1
 
