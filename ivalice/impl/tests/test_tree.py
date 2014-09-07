@@ -12,8 +12,8 @@ from sklearn.metrics import accuracy_score
 
 from sklearn.utils.testing import assert_almost_equal
 
-from ivalice.impl.tree import TreeRegressor
-from ivalice.impl.tree import TreeClassifier
+from ivalice.regression import TreeRegressor
+from ivalice.classification import TreeClassifier
 
 
 def _make_regression_datasets(n_times, sw=False):

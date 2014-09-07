@@ -6,7 +6,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.cross_validation import train_test_split
 from sklearn.utils.testing import assert_almost_equal
 
-from ivalice.impl.gradient_boosting import GBRegressor
+from ivalice.regression import GBRegressor
 
 bunch = load_diabetes()
 X, y = bunch.data, bunch.target

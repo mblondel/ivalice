@@ -4,8 +4,8 @@ from sklearn.datasets import load_diabetes
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.utils.testing import assert_almost_equal
 
-from ivalice.impl.mcrank import McRank
-from ivalice.impl.mcrank import OrdinalMcRank
+from ivalice.ranking import McRank
+from ivalice.ranking import OrdinalMcRank
 
 
 bunch = load_diabetes()

@@ -5,7 +5,7 @@ from sklearn.datasets import make_regression
 from sklearn.ensemble import RandomForestRegressor as skRF
 from sklearn.utils.testing import assert_almost_equal
 
-from ivalice.impl.forest import RFRegressor
+from ivalice.regression import RFRegressor
 
 diabetes = load_diabetes()
 X_d, y_d = diabetes.data, diabetes.target

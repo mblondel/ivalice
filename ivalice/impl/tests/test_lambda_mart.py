@@ -4,7 +4,7 @@ from sklearn.datasets import load_diabetes
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.utils.testing import assert_almost_equal
 
-from ivalice.impl.lambda_mart import LambdaMART
+from ivalice.ranking import LambdaMART
 
 data = load_diabetes()
 X, y = data.data, data.target
