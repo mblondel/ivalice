@@ -28,7 +28,7 @@ def _weighted_median(data, weights):
     return _weighted_quantile(data, weights, 0.5)
 
 
-class QuantileEstimator(BaseEstimator):
+class _QuantileEstimator(BaseEstimator):
     """An estimator predicting the alpha-quantile of the training targets."""
     def __init__(self, alpha=0.9):
         if not 0 < alpha < 1.0:
@@ -45,7 +45,7 @@ class QuantileEstimator(BaseEstimator):
         return y
 
 
-class MeanEstimator(BaseEstimator):
+class _MeanEstimator(BaseEstimator):
     """An estimator predicting the mean of the training targets."""
     def fit(self, X, y):
         self.mean = np.mean(y)
@@ -57,10 +57,10 @@ class MeanEstimator(BaseEstimator):
         return y
 
 
-class SquareLoss(object):
+class _SquareLoss(object):
 
     def init_estimator(self):
-        return MeanEstimator()
+        return _MeanEstimator()
 
     def negative_gradient(self, y, y_pred):
         return y - y_pred
@@ -69,10 +69,10 @@ class SquareLoss(object):
         return 1.0
 
 
-class AbsoluteLoss(object):
+class _AbsoluteLoss(object):
 
     def init_estimator(self):
-        return QuantileEstimator(alpha=0.5)
+        return _QuantileEstimator(alpha=0.5)
 
     def negative_gradient(self, y, y_pred):
         return np.sign(y - y_pred)
@@ -85,25 +85,7 @@ class AbsoluteLoss(object):
         return _weighted_median(diff, np.abs(h_pred))
 
 
-class GBRegressor(BaseEstimator):
-
-    def __init__(self, estimator, n_estimators=100,
-                 step_size="line_search", learning_rate=0.1,
-                 loss="squared", subsample=1.0,
-                 callback=None, random_state=None):
-        self.estimator = estimator
-        self.n_estimators = n_estimators
-        self.step_size = step_size
-        self.learning_rate = learning_rate
-        self.loss = loss
-        self.subsample = subsample
-        self.callback = callback
-        self.random_state = random_state
-
-    def _get_loss(self):
-        losses = dict(squared=SquareLoss(),
-                      absolute=AbsoluteLoss())
-        return losses[self.loss]
+class _BaseGB(BaseEstimator):
 
     def _fit(self, X, y, loss, rng):
         if self.subsample != 1.0:
@@ -121,9 +103,11 @@ class GBRegressor(BaseEstimator):
 
         h_pred = est.predict(X)
 
-        if self.step_size == "line_search":
+        step_size = getattr(self, "step_size", "constant")
+
+        if step_size == "line_search":
             step_size = loss.step_size(y, y_pred, h_pred)
-        elif self.step_size == "constant":
+        elif step_size == "constant":
             step_size = 1.0
         else:
             raise ValueError("Unknown step size.")
@@ -158,3 +142,24 @@ class GBRegressor(BaseEstimator):
         for i, est in enumerate(self.estimators_):
             pred += self.estimator_weights_[i] * est.predict(X)
         return pred
+
+
+class GBRegressor(_BaseGB, RegressorMixin):
+
+    def __init__(self, estimator, n_estimators=100,
+                 step_size="line_search", learning_rate=0.1,
+                 loss="squared", subsample=1.0,
+                 callback=None, random_state=None):
+        self.estimator = estimator
+        self.n_estimators = n_estimators
+        self.step_size = step_size
+        self.learning_rate = learning_rate
+        self.loss = loss
+        self.subsample = subsample
+        self.callback = callback
+        self.random_state = random_state
+
+    def _get_loss(self):
+        losses = dict(squared=_SquareLoss(),
+                      absolute=_AbsoluteLoss())
+        return losses[self.loss]
