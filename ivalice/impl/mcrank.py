@@ -50,7 +50,10 @@ class _BaseMcRank(BaseEstimator):
 class McRank(_BaseMcRank):
 
     def set_estimator_params(self, **params):
-        self.estimator_.set_params(**params)
+        self.estimator.set_params(**params)
+
+        if hasattr(self, "estimator_"):
+            self.estimator_.set_params(**params)
 
     def fit(self, X, y):
         self._label_encoder = LabelEncoder()
@@ -91,8 +94,11 @@ class OrdinalMcRank(_BaseMcRank):
         est.fit(X, y_bin)
 
     def set_estimator_params(self, **params):
-        for est in self.estimators_:
-            est.set_params(**params)
+        self.estimator.set_params(**params)
+
+        if hasattr(self, "estimators_"):
+            for est in self.estimators_:
+                est.set_params(**params)
 
     def fit(self, X, y):
         self._label_encoder = LabelEncoder()
