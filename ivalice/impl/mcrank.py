@@ -26,22 +26,6 @@ class _BaseMcRank(BaseEstimator):
         y_pred = self.predict(X)
         return np.mean(np.abs(y - y_pred))
 
-    def predict_proba(self, X):
-        """Predict class probabilities for X.
-
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The input samples.
-
-        Returns
-        -------
-        p : array of shape = [n_samples, n_classes]
-            The class probabilities of the input samples. The order of the
-            classes corresponds to that in the attribute `classes_`.
-        """
-        return self.estimator_.predict_proba(X)
-
     def predict(self, X):
         """Predict expected target value for X.
 
@@ -65,35 +49,64 @@ class _BaseMcRank(BaseEstimator):
 
 class McRank(_BaseMcRank):
 
+    def set_estimator_params(self, **params):
+        self.estimator_.set_params(**params)
+
     def fit(self, X, y):
         self._label_encoder = LabelEncoder()
         y = self._label_encoder.fit_transform(y)
 
-        self.estimator_ = clone(self.estimator)
+        if not hasattr(self, "estimator_") or \
+           not getattr(self.estimator, "warm_start", False):
+            self.estimator_ = clone(self.estimator)
+
         self.estimator_.fit(X, y)
 
         return self
 
+    def predict_proba(self, X):
+        """Predict class probabilities for X.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        p : array of shape = [n_samples, n_classes]
+            The class probabilities of the input samples. The order of the
+            classes corresponds to that in the attribute `classes_`.
+        """
+        return self.estimator_.predict_proba(X)
+
 
 class OrdinalMcRank(_BaseMcRank):
 
-    def _fit(self, X, y, m):
+    def _fit(self, X, y, m, est):
         cond = y <= m
         y_bin = y.copy()
         y_bin[cond] = 0
         y_bin[~cond] = 1
-        estimator = clone(self.estimator)
-        estimator.fit(X, y_bin)
-        return estimator
+        est.fit(X, y_bin)
+
+    def set_estimator_params(self, **params):
+        for est in self.estimators_:
+            est.set_params(**params)
 
     def fit(self, X, y):
         self._label_encoder = LabelEncoder()
         y = self._label_encoder.fit_transform(y)
 
-        # FIXME: can be done in parallel.
-        self.estimators_ = []
-        for m in xrange(len(self.classes_) - 1):
-            self.estimators_.append(self._fit(X, y, m))
+        n_classifiers = len(self.classes_) - 1
+
+        if not hasattr(self, "estimators_") or \
+           not getattr(self.estimator, "warm_start", False):
+            self.estimators_ = [clone(self.estimator)
+                                for m in xrange(n_classifiers)]
+
+        for m in xrange(n_classifiers):
+            self._fit(X, y, m, self.estimators_[m])
 
         return self
 
