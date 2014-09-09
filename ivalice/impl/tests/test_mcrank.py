@@ -28,7 +28,7 @@ def test_mcrank_set_estimator_params():
                                     loss="deviance",
                                     random_state=0)
     mc = McRank(gb)
-    mc.set_estimator_params(n_estimators=10)
+    mc.set_params(estimator__n_estimators=10)
     assert_equal(gb.n_estimators, 10)
 
 
@@ -41,7 +41,7 @@ def test_mcrank_warm_start():
     mc.fit(X, y)
     assert_almost_equal(mc.score(X, y), 56.06, 1)
 
-    mc.set_estimator_params(n_estimators=10)
+    mc.set_params(estimator__n_estimators=10)
     mc.fit(X, y)
     assert_almost_equal(mc.score(X, y), 48.08, 2)
 
@@ -60,7 +60,7 @@ def test_ordinal_mcrank_set_estimator_params():
                                     loss="deviance",
                                     random_state=0)
     mc = OrdinalMcRank(gb)
-    mc.set_estimator_params(n_estimators=10)
+    mc.set_params(estimator__n_estimators=10)
     assert_equal(gb.n_estimators, 10)
 
 
@@ -74,6 +74,6 @@ def test_ordinal_mcrank_warm_start():
     mc.fit(X, y)
     assert_almost_equal(mc.score(X, y), 56.35, 2)
 
-    mc.set_estimator_params(n_estimators=10)
+    mc.set_params(estimator__n_estimators=10)
     mc.fit(X, y)
     assert_almost_equal(mc.score(X, y), 48.62, 2)

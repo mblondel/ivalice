@@ -46,14 +46,24 @@ class _BaseMcRank(BaseEstimator):
         # pred[i] = \sum_m P(y_i = m) * m
         return np.average(classes, axis=1, weights=proba)
 
+    def _get_estimator_params(self, **params):
+        est_params = {}
+        for key, value in params.items():
+            if key.startswith("estimator__"):
+                key = key.replace("estimator__", "")
+                est_params[key] = value
+        return est_params
+
 
 class McRank(_BaseMcRank):
 
-    def set_estimator_params(self, **params):
-        self.estimator.set_params(**params)
+    def set_params(self, **params):
+        super(McRank, self).set_params(**params)
 
-        if hasattr(self, "estimator_"):
-            self.estimator_.set_params(**params)
+        est_params = self._get_estimator_params(**params)
+
+        if hasattr(self, "estimator_") and len(est_params) > 0:
+            self.estimator_.set_params(**est_params)
 
     def fit(self, X, y):
         self._label_encoder = LabelEncoder()
@@ -93,12 +103,14 @@ class OrdinalMcRank(_BaseMcRank):
         y_bin[~cond] = 1
         est.fit(X, y_bin)
 
-    def set_estimator_params(self, **params):
-        self.estimator.set_params(**params)
+    def set_params(self, **params):
+        super(OrdinalMcRank, self).set_params(**params)
 
-        if hasattr(self, "estimators_"):
+        est_params = self._get_estimator_params(**params)
+
+        if hasattr(self, "estimators_") and len(est_params) > 0:
             for est in self.estimators_:
-                est.set_params(**params)
+                est.set_params(**est_params)
 
     def fit(self, X, y):
         self._label_encoder = LabelEncoder()
