@@ -66,7 +66,7 @@ class _SquareLoss(object):
     def negative_gradient(self, y, y_pred):
         return y - y_pred
 
-    def step_size(self, y, y_pred, h_pred):
+    def line_search(self, y, y_pred, h_pred):
         return 1.0
 
 
@@ -78,7 +78,7 @@ class _AbsoluteLoss(object):
     def negative_gradient(self, y, y_pred):
         return np.sign(y - y_pred)
 
-    def step_size(self, y, y_pred, h_pred):
+    def line_search(self, y, y_pred, h_pred):
         cond = h_pred != 0
         diff = y - y_pred
         diff[cond] /= h_pred[cond]
@@ -97,7 +97,7 @@ class _SquaredHingeLoss(object):
     def negative_gradient(self, y, y_pred):
         return 2 * np.maximum(1 - y * y_pred, 0) * y
 
-    def step_size(self, y, y_pred, h_pred):
+    def line_search(self, y, y_pred, h_pred):
         rho = 0
 
         y_h_pred = y * h_pred
@@ -137,7 +137,7 @@ class _BaseGB(BaseEstimator):
         step_size = getattr(self, "step_size", "constant")
 
         if step_size == "line_search":
-            step_size = loss.step_size(y, y_pred, h_pred)
+            step_size = loss.line_search(y, y_pred, h_pred)
         elif step_size == "constant":
             step_size = 1.0
         else:
