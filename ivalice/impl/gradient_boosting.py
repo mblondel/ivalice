@@ -88,6 +88,9 @@ class _AbsoluteLoss(object):
 
 class _SquaredHingeLoss(object):
 
+    def __init__(self, max_steps=1):
+        self.max_steps = max_steps
+
     def init_estimator(self):
         return _MeanEstimator()
 
@@ -95,7 +98,22 @@ class _SquaredHingeLoss(object):
         return 2 * np.maximum(1 - y * y_pred, 0) * y
 
     def step_size(self, y, y_pred, h_pred):
-        raise NotImplementedError
+        rho = 0
+
+        y_h_pred = y * h_pred
+        h_pred_sq = h_pred ** 2
+
+        for it in xrange(self.max_steps):
+            error = 1 - y * (y_pred + rho * h_pred)
+            Lp = -np.sum(np.maximum(error, 0) * y_h_pred)
+            Lpp = np.sum((error > 0) * h_pred_sq)
+
+            if Lpp == 0:
+                break
+
+            rho -= Lp / Lpp
+
+        return rho
 
 
 class _BaseGB(BaseEstimator):
