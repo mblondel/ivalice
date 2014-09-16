@@ -6,7 +6,8 @@
 import numpy as np
 from scipy import stats
 
-from sklearn.base import BaseEstimator, RegressorMixin, clone
+from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin, clone
+from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils import check_random_state
 
 
@@ -85,6 +86,18 @@ class _AbsoluteLoss(object):
         return _weighted_median(diff, np.abs(h_pred))
 
 
+class _SquaredHingeLoss(object):
+
+    def init_estimator(self):
+        return _MeanEstimator()
+
+    def negative_gradient(self, y, y_pred):
+        return 2 * np.maximum(1 - y * y_pred, 0) * y
+
+    def step_size(self, y, y_pred, h_pred):
+        raise NotImplementedError
+
+
 class _BaseGB(BaseEstimator):
 
     def _fit(self, X, y, loss, rng):
@@ -114,10 +127,6 @@ class _BaseGB(BaseEstimator):
 
         i = len(self.estimators_) - 1
         self.estimator_weights_[i] *= step_size
-        #if step_size == 0:
-            #self.estimator_weights_[i:] = 0
-        #else:
-            #self.estimator_weights_[i] *= step_size
 
     def fit(self, X, y):
         rng = check_random_state(self.random_state)
@@ -142,6 +151,35 @@ class _BaseGB(BaseEstimator):
         for i, est in enumerate(self.estimators_):
             pred += self.estimator_weights_[i] * est.predict(X)
         return pred
+
+
+class GBClassifier(_BaseGB, ClassifierMixin):
+
+    def __init__(self, estimator, n_estimators=100,
+                 step_size="line_search", learning_rate=0.1,
+                 loss="squared_hinge", subsample=1.0,
+                 callback=None, random_state=None):
+        self.estimator = estimator
+        self.n_estimators = n_estimators
+        self.step_size = step_size
+        self.learning_rate = learning_rate
+        self.loss = loss
+        self.subsample = subsample
+        self.callback = callback
+        self.random_state = random_state
+
+    def _get_loss(self):
+        losses = dict(squared_hinge=_SquaredHingeLoss())
+        return losses[self.loss]
+
+    def fit(self, X, y):
+        self._lb = LabelBinarizer(neg_label=-1)
+        y = self._lb.fit_transform(y)[:, 0]
+        return super(GBClassifier, self).fit(X, y)
+
+    def predict(self, X):
+        pred = super(GBClassifier, self).predict(X).reshape(-1, 1)
+        return self._lb.inverse_transform(pred)
 
 
 class GBRegressor(_BaseGB, RegressorMixin):

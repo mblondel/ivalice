@@ -1,11 +1,14 @@
 import numpy as np
 
 from sklearn.datasets import load_diabetes
+from sklearn.datasets import load_iris
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.cross_validation import train_test_split
 from sklearn.utils.testing import assert_almost_equal
 
+from ivalice.classification import GBClassifier
 from ivalice.regression import GBRegressor
 
 bunch = load_diabetes()
@@ -15,6 +18,7 @@ X_tr, X_te, y_tr, y_te = train_test_split(X, y,
                                           train_size=0.75,
                                           test_size=0.25,
                                           random_state=0)
+
 
 def test_squared_loss():
     reg = GradientBoostingRegressor(learning_rate=0.1, max_depth=3,
@@ -70,3 +74,15 @@ def test_subsample():
     y_pred = reg.predict(X_te)
     mse = np.sqrt(np.mean((y_pred - y_te) ** 2))
     assert_almost_equal(mse, 62.8, 1)
+
+
+def test_squared_hinge_loss():
+    iris = load_iris()
+    cond = iris.target <= 1
+    X_bin, y_bin = iris.data[cond], iris.target[cond]
+
+    clf = DecisionTreeClassifier(max_features=1.0, max_depth=3)
+    clf = GBClassifier(clf, n_estimators=10, step_size="constant",
+                       learning_rate=0.1)
+    clf.fit(X_bin, y_bin)
+    assert_almost_equal(clf.score(X_bin, y_bin), 1.0)
