@@ -229,11 +229,11 @@ class GBClassifier(_BaseGB, ClassifierMixin):
 
     def fit(self, X, y):
         self._lb = LabelBinarizer(neg_label=-1)
-        y = self._lb.fit_transform(y)[:, 0]
-        return super(GBClassifier, self).fit(X, y)
+        Y = self._lb.fit_transform(y)
+        return super(GBClassifier, self).fit(X, Y)
 
     def predict(self, X):
-        pred = self.decision_function(X).reshape(-1, 1)
+        pred = self.decision_function(X)
         return self._lb.inverse_transform(pred)
 
 

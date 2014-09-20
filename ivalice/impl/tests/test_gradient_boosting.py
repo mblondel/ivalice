@@ -32,6 +32,14 @@ X_bin_tr, X_bin_te, y_bin_tr, y_bin_te = train_test_split(X_bin, y_bin,
                                                           test_size=0.25,
                                                           random_state=0)
 
+iris = load_iris()
+X_mult, y_mult = iris.data, iris.target
+
+X_mult_tr, X_mult_te, y_mult_tr, y_mult_te = train_test_split(X_mult, y_mult,
+                                                          train_size=0.75,
+                                                          test_size=0.25,
+                                                          random_state=0)
+
 
 def test_squared_loss():
     reg = GradientBoostingRegressor(learning_rate=0.1, max_depth=3,
@@ -102,6 +110,21 @@ def test_squared_hinge_loss():
                        learning_rate=0.1)
     clf.fit(X_bin_te, y_bin_te)
     assert_almost_equal(clf.score(X_bin_te, y_bin_te), 1.0)
+
+
+def test_squared_hinge_loss_ovr():
+    # With line search.
+    clf = DecisionTreeClassifier(max_features=1.0, max_depth=3)
+    clf = GBClassifier(clf, n_estimators=10, step_size="line_search")
+    clf.fit(X_mult_tr, y_mult_tr)
+    assert_almost_equal(clf.score(X_mult_te, y_mult_te), 0.974, 3)
+
+    # With constant step size.
+    clf = DecisionTreeClassifier(max_features=1.0, max_depth=3)
+    clf = GBClassifier(clf, n_estimators=10, step_size="constant",
+                       learning_rate=0.1)
+    clf.fit(X_mult_te, y_mult_te)
+    assert_almost_equal(clf.score(X_mult_te, y_mult_te), 1.0)
 
 
 def test_multioutput_regression():
