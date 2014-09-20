@@ -2,11 +2,15 @@ import numpy as np
 
 from sklearn.datasets import load_diabetes
 from sklearn.datasets import load_iris
+from sklearn.datasets import load_linnerud
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.cross_validation import train_test_split
+from sklearn.metrics import r2_score
+
 from sklearn.utils.testing import assert_almost_equal
+from sklearn.utils.testing import assert_array_almost_equal
 
 from ivalice.classification import GBClassifier
 from ivalice.regression import GBRegressor
@@ -98,3 +102,17 @@ def test_squared_hinge_loss():
                        learning_rate=0.1)
     clf.fit(X_bin_te, y_bin_te)
     assert_almost_equal(clf.score(X_bin_te, y_bin_te), 1.0)
+
+
+def test_multioutput_regression():
+    data = load_linnerud()
+    X, Y = data.data, data.target
+
+    reg = DecisionTreeRegressor(max_features=1.0, max_depth=3)
+    reg = GBRegressor(reg, n_estimators=10, step_size="line_search")
+    Y_pred = reg.fit(X, Y).predict(X)
+
+    acc = [0.697, 0.744, 0.631]
+    acc2 = [r2_score(Y[:, k], Y_pred[:, k]) for k in xrange(Y.shape[1])]
+
+    assert_array_almost_equal(acc, acc2, 3)
