@@ -3,6 +3,10 @@
 # Author: Mathieu Blondel <mathieu@mblondel.org>
 # License: BSD 3 clause
 
+# Differences with scikit-learn:
+#   - accepts any base estimator (not only trees)
+#   - line search finds base estimator weights (not leaf weights)
+
 import numpy as np
 from scipy import stats
 
