@@ -7,8 +7,8 @@ Boosting and ensemble learning library in Python.
 
 Algorithms supported:
 
-- Classification and regression trees (CART)
-- Random forests
+- Classification and regression trees (work in progress)
+- Random forests (work in progress)
 - Gradient Boosting
 - McRank
 - LambdaMART
