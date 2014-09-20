@@ -207,6 +207,9 @@ class _BaseGB(BaseEstimator):
         else:
             return self._df_multi(X)
 
+    def predict(self, X):
+        return self.decision_function(X)
+
 
 class GBClassifier(_BaseGB, ClassifierMixin):
 
@@ -256,6 +259,3 @@ class GBRegressor(_BaseGB, RegressorMixin):
         losses = dict(squared=_SquareLoss(),
                       absolute=_AbsoluteLoss())
         return losses[self.loss]
-
-    def predict(self, X):
-        return self.decision_function(X)
