@@ -159,7 +159,7 @@ class _BaseGB(BaseEstimator):
         self.estimators_ = np.empty((self.n_estimators, n_vectors),
                                     dtype=np.object)
 
-        Y_pred = np.zeros((n_samples, n_vectors, dtype=np.float64)
+        Y_pred = np.zeros((n_samples, n_vectors), dtype=np.float64)
 
         # Initial estimator.
         for k in xrange(n_vectors):
