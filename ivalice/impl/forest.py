@@ -9,9 +9,6 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.base import RegressorMixin
 from sklearn.utils import check_random_state
 
-from .tree import TreeRegressor
-
-
 MAX_INT = np.iinfo(np.int32).max
 
 
@@ -66,6 +63,8 @@ class RFRegressor(_BaseRF, RegressorMixin):
     def fit(self, X, y, sample_weight=None):
         X = np.array(X, dtype=np.float64)
         y = np.array(y, dtype=np.float64)
+
+        from .tree import TreeRegressor
 
         tree = TreeRegressor(max_features=self.max_features,
                              max_depth=self.max_depth,
