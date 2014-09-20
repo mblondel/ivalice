@@ -126,7 +126,6 @@ class _BaseGB(BaseEstimator):
             y = y[ind]
             y_pred = y_pred[ind]
 
-        # FIXME: do not recompute predictions from scratch.
         negative_gradient = loss.negative_gradient(y, y_pred)
 
         est = clone(self.estimator)
@@ -150,6 +149,7 @@ class _BaseGB(BaseEstimator):
 
         ravel = len(y.shape) == 1
         Y = y.reshape(-1, 1) if ravel else y
+        n_samples = X.shape[0]
         n_vectors = Y.shape[1]
 
         self.estimator_weights_ = np.ones((self.n_estimators, n_vectors),
@@ -159,17 +159,21 @@ class _BaseGB(BaseEstimator):
         self.estimators_ = np.empty((self.n_estimators, n_vectors),
                                     dtype=np.object)
 
+        Y_pred = np.zeros((n_samples, n_vectors, dtype=np.float64)
+
         # Initial estimator
         for k in xrange(n_vectors):
-            self.estimators_[0, k] = loss.init_estimator().fit(X, Y[:, k])
+            est = loss.init_estimator().fit(X, Y[:, k])
+            self.estimators_[0, k] = est
+            Y_pred[:, k] += est.predict(X)
 
         for i in xrange(1, self.n_estimators):
-            Y_pred = self.decision_function(X)
-
             for k in xrange(n_vectors):
+
                 est, step_size = self._fit(X, Y[:, k], Y_pred[:, k], loss, rng)
                 self.estimators_[i, k] = est
                 self.estimator_weights_[i, k] *= step_size
+                Y_pred[:, k] += self.estimator_weights_[i, k] * est.predict(X)
 
             if self.callback is not None:
                 self.callback(self)
@@ -184,21 +188,23 @@ class _BaseGB(BaseEstimator):
         n_samples = X.shape[0]
         n_estimators, n_vectors = self.estimators_.shape
         pred = np.zeros((n_samples, n_vectors), dtype=np.float64)
+
         for i in xrange(n_estimators):
             for k in xrange(n_vectors):
                 est = self.estimators_[i, k]
-                if est is None: continue
                 pred[:, k] += self.estimator_weights_[i, k] * est.predict(X)
+
         return pred
 
     def _df(self, X):
         n_samples = X.shape[0]
         n_estimators = self.estimators_.shape[0]
         pred = np.zeros(n_samples, dtype=np.float64)
+
         for i in xrange(n_estimators):
             est = self.estimators_[i]
-            if est is None: continue
             pred += self.estimator_weights_[i] * est.predict(X)
+
         return pred
 
     def decision_function(self, X):
