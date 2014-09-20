@@ -127,6 +127,22 @@ def test_squared_hinge_loss_ovr():
     assert_almost_equal(clf.score(X_mult_te, y_mult_te), 1.0)
 
 
+def test_log_loss():
+    # With line search.
+    clf = DecisionTreeClassifier(max_features=1.0, max_depth=3)
+    clf = GBClassifier(clf, n_estimators=10, step_size="line_search",
+                       loss="log")
+    clf.fit(X_bin_tr, y_bin_tr)
+    assert_almost_equal(clf.score(X_bin_te, y_bin_te), 1.0)
+
+    # With constant step size.
+    clf = DecisionTreeClassifier(max_features=1.0, max_depth=3)
+    clf = GBClassifier(clf, n_estimators=10, step_size="constant",
+                       loss="log", learning_rate=0.1)
+    clf.fit(X_bin_te, y_bin_te)
+    assert_almost_equal(clf.score(X_bin_te, y_bin_te), 1.0)
+
+
 def test_multioutput_regression():
     data = load_linnerud()
     X, Y = data.data, data.target

@@ -116,6 +116,37 @@ class _SquaredHingeLoss(object):
         return rho
 
 
+class _LogLoss(object):
+
+    def __init__(self, max_steps=1):
+        self.max_steps = max_steps
+
+    def init_estimator(self):
+        return _MeanEstimator()
+
+    def negative_gradient(self, y, y_pred):
+        q = 1.0 / (1 + np.exp(-y * y_pred))
+        return -y * (q - 1)
+
+    def line_search(self, y, y_pred, h_pred):
+        rho = 0
+
+        y_h_pred = y * h_pred
+        h_pred_sq = h_pred ** 2
+
+        for it in xrange(self.max_steps):
+            q = 1.0 / (1 + np.exp(-y * (y_pred + rho * h_pred)))
+            Lp = np.sum((q - 1) * y_h_pred)
+            Lpp = np.sum(q * (1 - q) * h_pred_sq)
+
+            if Lpp == 0:
+                break
+
+            rho -= Lp / Lpp
+
+        return rho
+
+
 class _BaseGB(BaseEstimator):
 
     def _fit(self, X, y, y_pred, loss, rng):
@@ -234,7 +265,8 @@ class GBClassifier(_BaseGB, ClassifierMixin):
         self.random_state = random_state
 
     def _get_loss(self):
-        losses = dict(squared_hinge=_SquaredHingeLoss())
+        losses = dict(squared_hinge=_SquaredHingeLoss(),
+                      log=_LogLoss())
         return losses[self.loss]
 
     def fit(self, X, y):
