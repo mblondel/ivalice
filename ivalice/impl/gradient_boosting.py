@@ -198,6 +198,9 @@ class _BaseGB(BaseEstimator):
             self.estimators_[0, k] = est
             Y_pred[:, k] += est.predict(X)
 
+        if self.callback is not None:
+            self.callback(self)
+
         # Incremental fitting.
         for i in xrange(1, self.n_estimators):
             for k in xrange(n_vectors):
@@ -224,6 +227,7 @@ class _BaseGB(BaseEstimator):
         for i in xrange(n_estimators):
             for k in xrange(n_vectors):
                 est = self.estimators_[i, k]
+                if est is None: continue
                 pred[:, k] += self.estimator_weights_[i, k] * est.predict(X)
 
         return pred
@@ -235,6 +239,7 @@ class _BaseGB(BaseEstimator):
 
         for i in xrange(n_estimators):
             est = self.estimators_[i]
+            if est is None: continue
             pred += self.estimator_weights_[i] * est.predict(X)
 
         return pred
