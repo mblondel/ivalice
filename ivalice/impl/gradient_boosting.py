@@ -161,12 +161,13 @@ class _BaseGB(BaseEstimator):
 
         Y_pred = np.zeros((n_samples, n_vectors, dtype=np.float64)
 
-        # Initial estimator
+        # Initial estimator.
         for k in xrange(n_vectors):
             est = loss.init_estimator().fit(X, Y[:, k])
             self.estimators_[0, k] = est
             Y_pred[:, k] += est.predict(X)
 
+        # Incremental fitting.
         for i in xrange(1, self.n_estimators):
             for k in xrange(n_vectors):
 
