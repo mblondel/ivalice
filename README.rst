@@ -14,7 +14,7 @@ Algorithms supported:
 - LambdaMART
 
 ivalice follows the `scikit-learn <http://scikit-learn.org>`_ API conventions.
-Computationally demanding parts are implemented in `Numba
+Computationally demanding parts are implemented using `Numba
 <http://numba.pydata.org>`_.
 
 Dependencies
