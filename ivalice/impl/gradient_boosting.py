@@ -71,7 +71,11 @@ class _SquareLoss(object):
         return y - y_pred
 
     def line_search(self, y, y_pred, h_pred):
-        return 1.0
+        Lp = np.sum((y - y_pred) * h_pred)
+        Lpp = np.sum(h_pred * h_pred)
+        # Should be 1.0 assuming that the base learner perfectly fits the
+        # residuals.
+        return Lp/Lpp
 
 
 class _AbsoluteLoss(object):

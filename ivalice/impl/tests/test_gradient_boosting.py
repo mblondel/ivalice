@@ -8,6 +8,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.cross_validation import train_test_split
 from sklearn.metrics import r2_score
+from sklearn.svm import SVR
 
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_array_almost_equal
@@ -57,6 +58,14 @@ def test_squared_loss():
     assert_almost_equal(sk, iv, 0)
 
 
+def test_squared_loss_svr():
+    reg = SVR(kernel="rbf", gamma=10)
+    reg = GBRegressor(reg, n_estimators=10)
+    reg.fit(X_tr, y_tr)
+    y_pred = reg.predict(X_tr)
+    assert_almost_equal(np.mean((y_tr - y_pred) ** 2), 3778.3, 1)
+
+
 def test_absolute_loss():
     # Check absolute loss with scikit-learn implementation.
     reg = GradientBoostingRegressor(learning_rate=0.1, loss="lad",
@@ -94,7 +103,7 @@ def test_subsample():
     reg.fit(X_tr, y_tr)
     y_pred = reg.predict(X_te)
     mse = np.sqrt(np.mean((y_pred - y_te) ** 2))
-    assert_almost_equal(mse, 62.8, 1)
+    assert_almost_equal(mse, 62.9, 1)
 
 
 def test_squared_hinge_loss():
