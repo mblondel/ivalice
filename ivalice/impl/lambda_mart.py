@@ -36,7 +36,11 @@ def _negative_gradient(y, y_pred, c, idcg, max_rank, g):
 
 def _dcg_score(y_true, y_score, max_rank=10, gains="exponential"):
     order = np.lexsort((y_true, -y_score))
-    y_true = np.take(y_true, order[:max_rank])
+
+    if max_rank is not None:
+        order = order[:max_rank]
+
+    y_true = np.take(y_true, order)
 
     if gains == "exponential":
         gains = 2 ** y_true - 1
@@ -67,6 +71,8 @@ class _NDCGLoss(object):
     def negative_gradient(self, y, y_pred):
         n_samples = y.shape[0]
 
+        max_rank = self.max_rank if self.max_rank is not None else n_samples
+
         #order = np.argsort(y_pred)[::-1]
         order = np.lexsort((y, -y_pred))
         y = np.take(y, order)
@@ -74,14 +80,14 @@ class _NDCGLoss(object):
 
         ind = np.arange(n_samples)
         c = 1. / np.log2(ind + 2)  # discount factors
-        c[self.max_rank:] = 0
+        c[max_rank:] = 0
 
         g = np.zeros(n_samples, dtype=np.float64)
 
         y_sorted = np.sort(y)[::-1]
         idcg = np.sum(y_sorted * c)
 
-        _negative_gradient(y, y_pred, c, idcg, self.max_rank, g)
+        _negative_gradient(y, y_pred, c, idcg, max_rank, g)
 
         if np.any(np.isnan(g)):
             print "g contains NaNs"

@@ -18,3 +18,12 @@ def test_lambda_mart_ndcg():
         lm.fit(X, y)
         ndcg = lm.score(X, y)
         assert_almost_equal(ndcg, 1.0)
+
+
+def test_lambda_mart_ndcg_all():
+    for gains in ("linear", "exponential"):
+        reg = DecisionTreeRegressor()
+        lm = LambdaMART(reg, n_estimators=10, max_rank=None, gains=gains)
+        lm.fit(X, y)
+        ndcg = lm.score(X, y)
+        assert_almost_equal(ndcg, 1.0)
